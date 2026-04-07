@@ -8,12 +8,13 @@
   ],
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=web --filter=desktop",
     "dev:web": "turbo dev --filter=web",
     "dev:desktop": "turbo dev --filter=desktop",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
