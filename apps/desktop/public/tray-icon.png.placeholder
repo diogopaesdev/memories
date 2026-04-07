@@ -1,0 +1,6 @@
+Place your tray icon here:
+- tray-icon.png     (Linux, 16x16 or 22x22 PNG)
+- tray-icon.ico     (Windows, multi-size ICO)
+- tray-icon-mac.png (macOS, 16x16 or 18x18 template PNG, white on transparent)
+
+You can generate icons using: https://icon.kitchen or similar tools.
