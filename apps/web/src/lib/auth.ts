@@ -1,21 +1,35 @@
-import { betterAuth } from "better-auth"
-import { firebaseAdapter } from "better-auth/adapters/firebase"
-import { db } from "./firebase-admin"
+import type { NextAuthOptions } from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
 
-export const auth = betterAuth({
-  database: firebaseAdapter(db),
-  baseURL: process.env.BETTER_AUTH_URL!,
-  secret: process.env.BETTER_AUTH_SECRET!,
-  socialProviders: {
-    google: {
+export const authOptions: NextAuthOptions = {
+  providers: [
+    GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+  ],
+  session: { strategy: "jwt" },
+  callbacks: {
+    jwt({ token, account }) {
+      if (account) {
+        token.id = account.providerAccountId
+      }
+      return token
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string
+      }
+      return session
+    },
+    redirect({ url, baseUrl }) {
+      // Permitir redirect para páginas internas (incluindo /auth/desktop-success)
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      if (url.startsWith(baseUrl)) return url
+      return baseUrl
     },
   },
-  session: {
-    expiresIn: 60 * 60 * 24 * 30, // 30 days
-    updateAge: 60 * 60 * 24, // Update if older than 1 day
+  pages: {
+    signIn: "/login",
   },
-})
-
-export type Session = typeof auth.$Infer.Session
+}

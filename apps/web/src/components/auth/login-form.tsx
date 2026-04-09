@@ -1,27 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { signIn } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { toast } from "sonner"
 
 export function LoginForm() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/projects"
 
   async function handleGoogleLogin() {
     setLoading(true)
-    try {
-      await signIn.social({
-        provider: "google",
-        callbackURL: "/projects",
-      })
-    } catch {
-      toast.error("Erro ao fazer login. Tente novamente.")
-      setLoading(false)
-    }
+    await signIn("google", { callbackUrl })
   }
 
   return (

@@ -2,32 +2,33 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { FolderKanban, LayoutDashboard, Settings } from "lucide-react"
+import { FolderKanban, Download, Mic } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/projects", label: "Projetos", icon: FolderKanban },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/settings", label: "Configurações", icon: Settings },
+  { href: "/memories", label: "Memórias", icon: FolderKanban },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-56 bg-white border-r flex flex-col py-4 shrink-0">
-      <div className="px-4 mb-6">
-        <Link href="/projects" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <span className="font-semibold text-slate-800 text-sm">ProjectsReport</span>
-        </Link>
+    <aside className="w-56 bg-white border-r flex flex-col shrink-0">
+      {/* Logo */}
+      <div className="h-14 flex items-center gap-2.5 px-5 border-b">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm shrink-0">
+          <Mic className="w-3.5 h-3.5 text-white" />
+        </div>
+        <span className="font-bold text-slate-800 text-sm tracking-tight leading-none">
+          Projects<span className="text-blue-500">Report</span>
+        </span>
       </div>
 
-      <nav className="flex-1 px-2 space-y-1">
+      {/* Nav */}
+      <nav className="flex-1 p-3 space-y-0.5">
+        <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Menu
+        </p>
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
           return (
@@ -35,23 +36,34 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
-              <item.icon className="w-4 h-4" />
+              <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-blue-500" : "text-slate-400")} />
               {item.label}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-4 pt-4 border-t">
-        <p className="text-xs text-muted-foreground">
-          App desktop disponível para captura por voz
-        </p>
+      {/* Bottom — download desktop */}
+      <div className="p-3 border-t">
+        <Link
+          href="/download"
+          target="_blank"
+          className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors group"
+        >
+          <div className="w-7 h-7 rounded-md bg-white border border-slate-200 flex items-center justify-center shadow-sm shrink-0 group-hover:border-blue-200 transition-colors">
+            <Download className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-500 transition-colors" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-700 leading-none">App desktop</p>
+            <p className="text-[10px] text-slate-400 mt-0.5 leading-none">Captura por voz</p>
+          </div>
+        </Link>
       </div>
     </aside>
   )

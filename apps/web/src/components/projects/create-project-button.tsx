@@ -52,7 +52,7 @@ const ICONS: { value: ProjectIcon; label: string }[] = [
   { value: "zap", label: "Raio" },
 ]
 
-export function CreateProjectButton() {
+export function CreateProjectButton({ teamId }: { teamId?: string } = {}) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -78,10 +78,10 @@ export function CreateProjectButton() {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, teamId }),
       })
       if (!res.ok) throw new Error()
-      toast.success("Projeto criado com sucesso!")
+      toast.success("Memória criada!")
       setOpen(false)
       reset()
       router.refresh()
@@ -97,12 +97,12 @@ export function CreateProjectButton() {
       <DialogTrigger asChild>
         <Button>
           <Plus className="w-4 h-4" />
-          Novo Projeto
+          Nova Memória
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Criar novo projeto</DialogTitle>
+          <DialogTitle>Nova memória</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -164,7 +164,7 @@ export function CreateProjectButton() {
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Criando..." : "Criar Projeto"}
+              {loading ? "Criando..." : "Criar"}
             </Button>
           </DialogFooter>
         </form>

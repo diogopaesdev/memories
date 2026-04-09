@@ -6,9 +6,30 @@ contextBridge.exposeInMainWorld("electron", {
     set: (key: string, value: string | null) => ipcRenderer.invoke("store:set", key, value),
   },
   window: {
-    hideRecorder: () => ipcRenderer.invoke("window:hide-recorder"),
     closeLogin: () => ipcRenderer.invoke("window:close-login"),
+    setSize: (w: number, h: number) => ipcRenderer.invoke("window:set-size", w, h),
+    contextMenu: () => ipcRenderer.invoke("window:context-menu"),
+    openLogin: () => ipcRenderer.invoke("window:open-login"),
   },
   notify: (title: string, body: string) => ipcRenderer.invoke("notify", title, body),
   openWeb: (path: string) => ipcRenderer.invoke("open-web", path),
+  onAuthChanged: (cb: () => void) => {
+    ipcRenderer.on("auth:changed", cb)
+    return () => ipcRenderer.removeListener("auth:changed", cb)
+  },
+  listTeams: () => ipcRenderer.invoke("teams:list"),
+  exchangeCode: (code: string) => ipcRenderer.invoke("auth:exchange-code", code),
+  checkSession: () => ipcRenderer.invoke("auth:check-session"),
+  transcribe: (audioBuffer: ArrayBuffer, apiKey: string) => ipcRenderer.invoke("audio:transcribe", audioBuffer, apiKey),
+  processVoice: (transcript: string, openaiApiKey: string | null) => ipcRenderer.invoke("ai:process-voice", transcript, openaiApiKey),
+  realtime: {
+    start: (apiKey: string) => ipcRenderer.invoke("realtime:start", apiKey),
+    sendAudio: (audio: string) => ipcRenderer.send("realtime:audio", audio),
+    stop: () => ipcRenderer.invoke("realtime:stop"),
+    onEvent: (cb: (msg: unknown) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, msg: unknown) => cb(msg)
+      ipcRenderer.on("realtime:event", handler)
+      return () => ipcRenderer.removeListener("realtime:event", handler)
+    },
+  },
 })

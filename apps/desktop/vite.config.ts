@@ -9,18 +9,18 @@ export default defineConfig({
     react(),
     electron([
       {
-        entry: "src/main/index.ts",
+        entry: path.resolve(__dirname, "src/main/index.ts"),
         vite: {
           build: {
             outDir: "dist-electron/main",
             rollupOptions: {
-              external: ["electron", "electron-store"],
+              external: ["electron", "electron-store", "ws", "bufferutil", "utf-8-validate"],
             },
           },
         },
       },
       {
-        entry: "src/main/preload.ts",
+        entry: path.resolve(__dirname, "src/main/preload.ts"),
         onstart(options) {
           options.reload()
         },
@@ -42,9 +42,8 @@ export default defineConfig({
       "@projectsreport/shared": path.resolve(__dirname, "../../packages/shared/src/index.ts"),
     },
   },
-  root: "src/renderer",
   build: {
-    outDir: path.resolve(__dirname, "dist"),
+    outDir: "dist",
     emptyOutDir: true,
   },
 })

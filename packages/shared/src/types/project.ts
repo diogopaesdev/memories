@@ -27,6 +27,7 @@ export interface Project {
   color: ProjectColor
   icon: ProjectIcon
   ownerId: string
+  teamId?: string
   reportCount: number
   createdAt: Date
   updatedAt: Date
