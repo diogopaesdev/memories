@@ -2,14 +2,12 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { db } from "@/lib/firebase-admin"
 import { requireSession } from "@/lib/session"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { ReportActions } from "@/components/reports/report-actions"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Report } from "@projectsreport/shared"
 import { ArrowLeft, Mic, Pencil } from "lucide-react"
+import { getServerLang, serverT } from "@/lib/lang"
 
 interface Props {
   params: Promise<{ id: string; reportId: string }>
@@ -18,6 +16,8 @@ interface Props {
 export default async function ReportPage({ params }: Props) {
   const session = await requireSession()
   const { id, reportId } = await params
+  const lang = await getServerLang()
+  const t = serverT(lang)
 
   const project = await db.collection("projects").doc(id).get()
   if (!project.exists || project.data()?.ownerId !== session.user.id) notFound()
@@ -33,64 +33,98 @@ export default async function ReportPage({ params }: Props) {
     updatedAt: doc.data()?.updatedAt?.toDate(),
   } as Report
 
-  return (
-    <div className="max-w-3xl">
-      <div className="mb-6">
-        <Link
-          href={`/projects/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {project.data()?.name}
-        </Link>
+  const isVoice = report.source === "voice"
+  const locale = lang === "en" ? undefined : ptBR
 
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              {report.source === "voice" ? (
-                <Badge variant="secondary" className="gap-1">
-                  <Mic className="w-3 h-3" /> Por voz
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="gap-1">
-                  <Pencil className="w-3 h-3" /> Manual
-                </Badge>
-              )}
-              <Badge variant={report.status === "published" ? "success" : "secondary"}>
-                {report.status === "published" ? "Publicado" : "Rascunho"}
-              </Badge>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">{report.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Criado em {format(report.createdAt, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-            </p>
+  return (
+    <div className="max-w-2xl">
+      {/* Back */}
+      <Link
+        href={`/memories/${id}`}
+        className="inline-flex items-center gap-1.5 text-sm mb-8 transition-opacity hover:opacity-70"
+        style={{ color: "var(--mem-ink-3)" }}
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        {project.data()?.name}
+      </Link>
+
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+              style={{
+                background: isVoice ? "var(--mem-accent-muted)" : "var(--mem-surface-2)",
+                color: isVoice ? "var(--mem-accent)" : "var(--mem-ink-2)",
+              }}
+            >
+              {isVoice ? <Mic className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+              {isVoice ? t("report.voice") : t("report.manual")}
+            </span>
+            <span
+              className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full"
+              style={{
+                background: report.status === "published" ? "rgba(34,197,94,0.1)" : "var(--mem-surface-2)",
+                color: report.status === "published" ? "#16a34a" : "var(--mem-ink-3)",
+              }}
+            >
+              {report.status === "published" ? t("report.published") : t("report.draft")}
+            </span>
           </div>
           <ReportActions report={report} projectId={id} />
         </div>
 
+        <h1 className="text-3xl font-bold tracking-tight leading-tight mb-3" style={{ color: "var(--mem-ink)" }}>
+          {report.title}
+        </h1>
+
+        <p className="text-sm" style={{ color: "var(--mem-ink-3)" }}>
+          {format(report.createdAt, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale })}
+        </p>
+
         {report.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          <div className="flex flex-wrap gap-1.5 mt-4">
             {report.tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
+              <span
+                key={tag}
+                className="text-xs px-2.5 py-1 rounded-full font-medium"
+                style={{ background: "var(--mem-surface-2)", color: "var(--mem-ink-2)" }}
+              >
                 {tag}
-              </Badge>
+              </span>
             ))}
           </div>
         )}
       </div>
 
-      <Separator className="mb-6" />
+      {/* Divider */}
+      <div className="h-px mb-8" style={{ background: "var(--mem-border)" }} />
 
-      <div className="prose prose-slate max-w-none">
-        <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">{report.content}</div>
+      {/* Content */}
+      <div
+        className="text-base whitespace-pre-wrap"
+        style={{ color: "var(--mem-ink)", lineHeight: "1.9" }}
+      >
+        {report.content}
       </div>
 
+      {/* Transcript */}
       {report.rawTranscript && (
-        <div className="mt-8 p-4 bg-slate-50 rounded-lg border">
-          <h3 className="text-sm font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
-            <Mic className="w-4 h-4" /> Transcrição original
+        <div
+          className="mt-10 p-5 rounded-xl border"
+          style={{ background: "var(--mem-surface)", borderColor: "var(--mem-border)" }}
+        >
+          <h3
+            className="text-xs font-semibold uppercase tracking-widest mb-3 flex items-center gap-2"
+            style={{ color: "var(--mem-ink-3)" }}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            {t("report.transcript")}
           </h3>
-          <p className="text-sm text-muted-foreground italic">{report.rawTranscript}</p>
+          <p className="text-sm italic leading-relaxed" style={{ color: "var(--mem-ink-2)" }}>
+            {report.rawTranscript}
+          </p>
         </div>
       )}
     </div>

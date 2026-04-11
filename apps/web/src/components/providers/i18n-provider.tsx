@@ -1,7 +1,11 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import { translations, type Lang, type TranslationKey } from "@/lib/i18n"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { translations } from "@/lib/i18n"
+
+export type Lang = "pt" | "en"
+
+export type TranslationKey = keyof typeof translations.pt
 
 interface I18nContextValue {
   lang: Lang
@@ -9,40 +13,49 @@ interface I18nContextValue {
   t: (key: TranslationKey) => string
 }
 
+// Safe default: always returns the Portuguese string, never the raw key
+function makeT(lang: Lang): (key: TranslationKey) => string {
+  return (key) => {
+    const dict = lang === "en" ? translations.en : translations.pt
+    return (dict as Record<string, string>)[key as string] ?? key
+  }
+}
+
 const I18nContext = createContext<I18nContextValue>({
   lang: "pt",
   setLang: () => {},
-  t: (k) => k,
+  t: makeT("pt"),
 })
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("pt")
 
   useEffect(() => {
-    const stored = localStorage.getItem("mem-lang") as Lang | null
-    if (stored === "pt" || stored === "en") {
-      setLangState(stored)
-    } else {
-      setLangState(navigator.language.startsWith("pt") ? "pt" : "en")
+    try {
+      const stored = localStorage.getItem("mem-lang")
+      if (stored === "pt" || stored === "en") {
+        setLangState(stored)
+      } else {
+        const browser = navigator.language.toLowerCase().startsWith("pt") ? "pt" : "en"
+        setLangState(browser)
+      }
+    } catch {
+      // localStorage blocked in some browser contexts
     }
   }, [])
 
-  function setLang(l: Lang) {
+  const setLang = useCallback((l: Lang) => {
     setLangState(l)
-    localStorage.setItem("mem-lang", l)
-  }
+    try { localStorage.setItem("mem-lang", l) } catch {}
+    // Cookie for server components (readable by Next.js cookies())
+    try { document.cookie = `mem-lang=${l};path=/;max-age=31536000;SameSite=lax` } catch {}
+  }, [])
 
-  function t(key: TranslationKey): string {
-    return (translations[lang] as Record<string, string>)[key] ??
-      (translations.pt as Record<string, string>)[key] ??
-      key
-  }
+  const t = useMemo(() => makeT(lang), [lang])
 
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  )
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t])
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 export const useI18n = () => useContext(I18nContext)

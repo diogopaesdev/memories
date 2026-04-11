@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { signOut } from "@/lib/auth-client"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, LogOut, Moon, Plus, Sun, UserPlus } from "lucide-react"
 import type { Team } from "@projectsreport/shared"
 import { useTheme } from "@/components/providers/theme-provider"
@@ -112,7 +112,7 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
 
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
               <rect width="40" height="40" rx="9" fill="var(--mem-ink)" />
               <circle cx="20" cy="20" r="3.5" fill="var(--mem-bg)" />
               <circle cx="20" cy="20" r="8.5" stroke="var(--mem-bg)" strokeWidth="1.5" opacity="0.55" />
@@ -126,19 +126,14 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
           {/* Team switcher */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors outline-none"
-                style={{ color: "var(--mem-ink)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--mem-surface-2)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              >
+              <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-[var(--mem-surface-2)] outline-none" style={{ color: "var(--mem-ink)" }}>
                 <div
                   className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0"
                   style={{ background: currentTeam?.isPersonal ? "#7c6af0" : "#0ea5e9" }}
                 >
                   {currentTeam?.name?.[0]?.toUpperCase() ?? "P"}
                 </div>
-                <span>{currentTeam?.name ?? "Personal"}</span>
+                <span className="max-w-[120px] truncate">{currentTeam?.name ?? "Personal"}</span>
                 <ChevronDown className="w-3.5 h-3.5 opacity-40" />
               </button>
             </DropdownMenuTrigger>
@@ -159,25 +154,17 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
                     {team.name[0].toUpperCase()}
                   </div>
                   <span className="flex-1 truncate">{team.name}</span>
-                  {team.id === currentTeamId && (
-                    <Check className="w-3.5 h-3.5 shrink-0 text-primary" />
-                  )}
+                  {team.id === currentTeamId && <Check className="w-3.5 h-3.5 shrink-0 text-primary" />}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
               {currentTeam && (
-                <DropdownMenuItem
-                  onClick={() => setInviteOpen(true)}
-                  className="cursor-pointer gap-2"
-                >
+                <DropdownMenuItem onClick={() => setInviteOpen(true)} className="cursor-pointer gap-2">
                   <UserPlus className="w-3.5 h-3.5" />
                   {t("invite-to")} {currentTeam.name}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={() => setCreateOpen(true)}
-                className="cursor-pointer gap-2"
-              >
+              <DropdownMenuItem onClick={() => setCreateOpen(true)} className="cursor-pointer gap-2">
                 <Plus className="w-3.5 h-3.5" />
                 {t("new-team")}
               </DropdownMenuItem>
@@ -186,37 +173,30 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
 
           {/* Right controls */}
           <div className="flex items-center gap-1">
-            {/* Language toggle */}
             <button
-              onClick={() => setLang(lang === "pt" ? "en" : "pt")}
-              className="h-8 px-2.5 rounded-lg text-xs font-medium transition-colors"
+              onClick={() => {
+                setLang(lang === "pt" ? "en" : "pt")
+                router.refresh()
+              }}
+              className="h-8 px-2.5 rounded-lg text-xs font-medium transition-colors hover:bg-[var(--mem-surface-2)] flex items-center gap-1"
               style={{ color: "var(--mem-ink-2)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--mem-surface-2)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-              title={lang === "pt" ? t("lang.en") : t("lang.pt")}
+              title={lang === "pt" ? "Switch to English" : "Mudar para Português"}
             >
-              {lang === "pt" ? "EN" : "PT"}
+              <span>{lang === "pt" ? "🇧🇷" : "🇺🇸"}</span>
+              <span>{lang === "pt" ? "PT" : "EN"}</span>
             </button>
 
-            {/* Theme toggle */}
             <button
               onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}
-              className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors"
+              className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--mem-surface-2)]"
               style={{ color: "var(--mem-ink-2)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--mem-surface-2)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               title={resolved === "dark" ? t("theme.light") : t("theme.dark")}
             >
-              {resolved === "dark" ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
+              {resolved === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* User avatar */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 outline-none ml-1">
+              <DropdownMenuTrigger className="flex items-center outline-none ml-1">
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={user.image ?? undefined} alt={user.name} />
                   <AvatarFallback
@@ -237,8 +217,7 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
                   onClick={() => signOut({ callbackUrl: "/login" })}
                   className="text-destructive cursor-pointer focus:text-destructive gap-2"
                 >
-                  <LogOut className="w-4 h-4" />
-                  {t("sign-out")}
+                  <LogOut className="w-4 h-4" /> {t("sign-out")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -249,25 +228,14 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
       {/* Dialog: criar time */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{t("new-team-title")}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{t("new-team-title")}</DialogTitle></DialogHeader>
           <div className="space-y-2">
             <Label>{t("team-name")}</Label>
-            <Input
-              placeholder={t("team-name-placeholder")}
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreateTeam()}
-            />
+            <Input placeholder={t("team-name-placeholder")} value={teamName} onChange={(e) => setTeamName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreateTeam()} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={handleCreateTeam} disabled={loading || !teamName.trim()}>
-              {loading ? t("creating") : t("create")}
-            </Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={handleCreateTeam} disabled={loading || !teamName.trim()}>{loading ? t("creating") : t("create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -275,28 +243,14 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
       {/* Dialog: convidar */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {t("invite-title")} {currentTeam?.name}
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{t("invite-title")} {currentTeam?.name}</DialogTitle></DialogHeader>
           <div className="space-y-2">
             <Label>{t("email")}</Label>
-            <Input
-              type="email"
-              placeholder={t("email-placeholder")}
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-            />
+            <Input type="email" placeholder={t("email-placeholder")} value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleInvite()} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteOpen(false)}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={handleInvite} disabled={loading || !inviteEmail.trim()}>
-              {loading ? t("sending") : t("send")}
-            </Button>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={handleInvite} disabled={loading || !inviteEmail.trim()}>{loading ? t("sending") : t("send")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select"
 import { createProjectSchema, type CreateProjectSchema } from "@/lib/validations/project"
 import type { ProjectColor, ProjectIcon } from "@projectsreport/shared"
+import { useI18n } from "@/components/providers/i18n-provider"
 
 const COLORS: { value: ProjectColor; label: string; class: string }[] = [
   { value: "blue", label: "Azul", class: "bg-blue-500" },
@@ -56,6 +57,7 @@ export function CreateProjectButton({ teamId }: { teamId?: string } = {}) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { t } = useI18n()
 
   const {
     register,
@@ -81,12 +83,12 @@ export function CreateProjectButton({ teamId }: { teamId?: string } = {}) {
         body: JSON.stringify({ ...data, teamId }),
       })
       if (!res.ok) throw new Error()
-      toast.success("Memória criada!")
+      toast.success(t("memories.new") + "!")
       setOpen(false)
       reset()
       router.refresh()
     } catch {
-      toast.error("Erro ao criar projeto.")
+      toast.error(t("toast-team-error"))
     } finally {
       setLoading(false)
     }
@@ -95,14 +97,17 @@ export function CreateProjectButton({ teamId }: { teamId?: string } = {}) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <button
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-85"
+          style={{ background: "var(--mem-ink)", color: "var(--mem-bg)" }}
+        >
           <Plus className="w-4 h-4" />
-          Nova Memória
-        </Button>
+          {t("memories.new")}
+        </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova memória</DialogTitle>
+          <DialogTitle>{t("memories.new")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -161,10 +166,10 @@ export function CreateProjectButton({ teamId }: { teamId?: string } = {}) {
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Criando..." : "Criar"}
+              {loading ? t("creating") : t("create")}
             </Button>
           </DialogFooter>
         </form>
