@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /download
+Disallow: /api/
+Disallow: /memories/
+Disallow: /connect-desktop/
+Disallow: /projects/
+
+Sitemap: https://memories.app/sitemap.xml

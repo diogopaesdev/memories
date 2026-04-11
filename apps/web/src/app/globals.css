@@ -27,49 +27,75 @@
 }
 
 @layer base {
+  /* ── Light (Memories warm paper aesthetic) ── */
   :root {
-    --background: hsl(0 0% 100%);
-    --foreground: hsl(222.2 84% 4.9%);
+    --background: hsl(40 18% 97%);
+    --foreground: hsl(36 80% 8%);
     --card: hsl(0 0% 100%);
-    --card-foreground: hsl(222.2 84% 4.9%);
+    --card-foreground: hsl(36 80% 8%);
     --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(222.2 84% 4.9%);
-    --primary: hsl(221.2 83.2% 53.3%);
-    --primary-foreground: hsl(210 40% 98%);
-    --secondary: hsl(210 40% 96.1%);
-    --secondary-foreground: hsl(222.2 47.4% 11.2%);
-    --muted: hsl(210 40% 96.1%);
-    --muted-foreground: hsl(215.4 16.3% 46.9%);
-    --accent: hsl(210 40% 96.1%);
-    --accent-foreground: hsl(222.2 47.4% 11.2%);
-    --destructive: hsl(0 84.2% 60.2%);
-    --destructive-foreground: hsl(210 40% 98%);
-    --border: hsl(214.3 31.8% 91.4%);
-    --input: hsl(214.3 31.8% 91.4%);
-    --ring: hsl(221.2 83.2% 53.3%);
-    --radius: 0.5rem;
+    --popover-foreground: hsl(36 80% 8%);
+    --primary: hsl(252 68% 58%);
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(40 14% 92%);
+    --secondary-foreground: hsl(36 80% 8%);
+    --muted: hsl(40 14% 92%);
+    --muted-foreground: hsl(36 10% 45%);
+    --accent: hsl(40 14% 92%);
+    --accent-foreground: hsl(36 80% 8%);
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(38 14% 86%);
+    --input: hsl(38 14% 86%);
+    --ring: hsl(252 68% 58%);
+    --radius: 0.625rem;
+
+    /* Memories design tokens */
+    --mem-bg: #f5f4f0;
+    --mem-surface: #ffffff;
+    --mem-surface-2: #f0ede8;
+    --mem-border: #e8e6e0;
+    --mem-ink: #1a1a1a;
+    --mem-ink-2: #6b6960;
+    --mem-ink-3: #9a9590;
+    --mem-accent: #7c6af0;
+    --mem-accent-muted: #ede9ff;
+    --mem-header-bg: #f5f4f0;
   }
 
+  /* ── Dark (warm dark, not cold blue) ── */
   .dark {
-    --background: hsl(222.2 84% 4.9%);
-    --foreground: hsl(210 40% 98%);
-    --card: hsl(222.2 84% 4.9%);
-    --card-foreground: hsl(210 40% 98%);
-    --popover: hsl(222.2 84% 4.9%);
-    --popover-foreground: hsl(210 40% 98%);
-    --primary: hsl(217.2 91.2% 59.8%);
-    --primary-foreground: hsl(222.2 47.4% 11.2%);
-    --secondary: hsl(217.2 32.6% 17.5%);
-    --secondary-foreground: hsl(210 40% 98%);
-    --muted: hsl(217.2 32.6% 17.5%);
-    --muted-foreground: hsl(215 20.2% 65.1%);
-    --accent: hsl(217.2 32.6% 17.5%);
-    --accent-foreground: hsl(210 40% 98%);
-    --destructive: hsl(0 62.8% 30.6%);
-    --destructive-foreground: hsl(210 40% 98%);
-    --border: hsl(217.2 32.6% 17.5%);
-    --input: hsl(217.2 32.6% 17.5%);
-    --ring: hsl(224.3 76.3% 48%);
+    --background: hsl(36 8% 7%);
+    --foreground: hsl(38 16% 94%);
+    --card: hsl(36 7% 10%);
+    --card-foreground: hsl(38 16% 94%);
+    --popover: hsl(36 7% 11%);
+    --popover-foreground: hsl(38 16% 94%);
+    --primary: hsl(252 72% 72%);
+    --primary-foreground: hsl(252 80% 15%);
+    --secondary: hsl(36 6% 16%);
+    --secondary-foreground: hsl(38 12% 80%);
+    --muted: hsl(36 6% 16%);
+    --muted-foreground: hsl(36 8% 54%);
+    --accent: hsl(36 6% 16%);
+    --accent-foreground: hsl(38 12% 85%);
+    --destructive: hsl(0 62% 50%);
+    --destructive-foreground: hsl(38 16% 94%);
+    --border: hsl(36 6% 17%);
+    --input: hsl(36 6% 17%);
+    --ring: hsl(252 72% 72%);
+
+    /* Memories design tokens – dark */
+    --mem-bg: #111110;
+    --mem-surface: #1c1c1a;
+    --mem-surface-2: #252521;
+    --mem-border: #2d2d2a;
+    --mem-ink: #f0ede8;
+    --mem-ink-2: #9a9590;
+    --mem-ink-3: #6b6960;
+    --mem-accent: #9d8df8;
+    --mem-accent-muted: #1e1a30;
+    --mem-header-bg: #151513;
   }
 
   * {
@@ -77,7 +103,9 @@
   }
 
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--mem-bg);
+    color: var(--mem-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }

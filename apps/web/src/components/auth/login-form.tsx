@@ -5,11 +5,13 @@ import { useSearchParams } from "next/navigation"
 import { signIn } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useI18n } from "@/components/providers/i18n-provider"
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") ?? "/projects"
+  const { t } = useI18n()
 
   async function handleGoogleLogin() {
     setLoading(true)
@@ -17,18 +19,32 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Entrar na sua conta</CardTitle>
-        <CardDescription>Use sua conta Google para acessar o painel</CardDescription>
+    <Card
+      className="shadow-sm border"
+      style={{
+        background: "var(--mem-surface)",
+        borderColor: "var(--mem-border)",
+      }}
+    >
+      <CardHeader className="text-center pb-4">
+        <CardTitle className="text-lg" style={{ color: "var(--mem-ink)" }}>
+          {t("login.card-title")}
+        </CardTitle>
+        <CardDescription style={{ color: "var(--mem-ink-2)" }}>
+          {t("login.card-desc")}
+        </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <Button
           onClick={handleGoogleLogin}
           disabled={loading}
           className="w-full"
           size="lg"
           variant="outline"
+          style={{
+            borderColor: "var(--mem-border)",
+            color: "var(--mem-ink)",
+          }}
         >
           {loading ? (
             <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
@@ -43,11 +59,11 @@ export function LoginForm() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
           )}
-          {loading ? "Entrando..." : "Continuar com Google"}
+          {loading ? t("login.signing-in") : t("login.button")}
         </Button>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Ao entrar, você concorda com os termos de uso da plataforma.
+        <p className="text-center text-xs" style={{ color: "var(--mem-ink-3)" }}>
+          {t("login.terms")}
         </p>
       </CardContent>
     </Card>
