@@ -1,5 +1,7 @@
 {
-  "name": "desktop",
+  "name": "memories-desktop",
+  "description": "Capture and retrieve work memories by voice",
+  "author": "diogopaesdev",
   "version": "0.0.6",
   "private": true,
   "main": "dist-electron/main/index.js",
@@ -23,7 +25,7 @@
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron": "^35.1.2",
+    "electron": "35.1.2",
     "electron-builder": "^25.1.8",
     "lucide-react": "^0.479.0",
     "postcss": "^8.5.3",
