@@ -31,6 +31,7 @@ Thumbs.db
 # Electron
 apps/desktop/release
 apps/desktop/out
+apps/desktop/dist-electron
 
 # Logs
 *.log
