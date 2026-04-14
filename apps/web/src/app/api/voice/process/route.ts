@@ -4,20 +4,18 @@ import { requireSession } from "@/lib/session"
 export async function POST(req: NextRequest) {
   try {
     await requireSession()
-    const { transcript } = await req.json()
+    const { transcript, openaiApiKey } = await req.json()
 
     if (!transcript || typeof transcript !== "string") {
       return NextResponse.json({ error: "transcript is required" }, { status: 400 })
     }
 
-    // If no OpenAI key, return raw transcript as-is
-    if (!process.env.OPENAI_API_KEY) {
-      const title = transcript.slice(0, 60).trim() + (transcript.length > 60 ? "..." : "")
-      return NextResponse.json({ title, content: transcript, tags: [] })
+    if (!openaiApiKey) {
+      return NextResponse.json({ error: "openai_key_missing", needsApiKey: true }, { status: 422 })
     }
 
     const { default: OpenAI } = await import("openai")
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const openai = new OpenAI({ apiKey: openaiApiKey })
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",

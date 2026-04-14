@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "transcript is required" }, { status: 400 })
     }
 
-    const apiKey = openaiApiKey || process.env.OPENAI_API_KEY
+    const apiKey = openaiApiKey
     if (!apiKey) {
       return NextResponse.json({ error: "openai_key_missing", needsApiKey: true }, { status: 422 })
     }
