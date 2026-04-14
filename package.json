@@ -8,9 +8,9 @@
   ],
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev --filter=web --filter=desktop",
+    "dev": "turbo dev --filter=web --filter=memories-desktop",
     "dev:web": "turbo dev --filter=web",
-    "dev:desktop": "turbo dev --filter=desktop",
+    "dev:desktop": "turbo dev --filter=memories-desktop",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "clean": "turbo clean && rm -rf node_modules",
