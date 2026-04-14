@@ -19,6 +19,7 @@ interface ElectronBridge {
   processVoice: (transcript: string, openaiApiKey: string | null) => Promise<import("./api").VoiceResult>
   processChat: (transcript: string, history: {role: string; content: string}[], openaiApiKey: string | null) => Promise<import("./api").ChatResponse>
   tts: (text: string, apiKey: string) => Promise<string>
+  getUsername: () => Promise<string>
   openApp: (appName: string) => Promise<void>
   mouseAction: (action: string, x: number, y: number, extra?: number) => Promise<void>
   recording: {

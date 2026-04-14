@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Settings, ArrowLeft, Key, CheckCircle2, ChevronDown, ExternalLink, LogOut, LogIn, Mic } from "lucide-react"
+import { Settings, ArrowLeft, Key, CheckCircle2, ChevronDown, ExternalLink, LogOut, Mic } from "lucide-react"
 import { useContinuousListener } from "@/hooks/use-voice-recorder"
 import { electronAPI } from "@/lib/electron"
 import type { Session, ChatMessage } from "@/lib/api"
@@ -199,9 +199,14 @@ export function RecorderWindow() {
   const [isRecording, setIsRecording]       = useState(false)
   const [currentRecName, setCurrentRecName] = useState<string | null>(null)
   const [messages, setMessages]             = useState<AppMessage[]>([])
+  const [pcName, setPcName]                 = useState<string | null>(null)
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [codeInput, setCodeInput]           = useState("")
+  const [activeStep, setActiveStep]         = useState<"account" | "apikey" | null>(null)
   const messagesRef = useRef<AppMessage[]>([])
   const chatEndRef  = useRef<HTMLDivElement>(null)
   const panelOpenRef = useRef(false)
+  const hasGreetedRef = useRef(false)
   // Persistent AudioContext at 24kHz — same rate as the recording context,
   // so both share the same WASAPI device stream on Windows without conflict
   const outputCtxRef = useRef<AudioContext | null>(null)
@@ -250,11 +255,27 @@ export function RecorderWindow() {
     setMessages([...messagesRef.current])
   }
 
+  function buildGreeting(overrides?: { authed?: boolean; hasKey?: boolean }): string {
+    const name    = pcNameRef.current
+    const authed  = overrides?.authed  ?? (sessionRef.current !== null && sessionRef.current !== "loading")
+    const hasKey  = overrides?.hasKey  ?? Boolean(savedKeyRef.current)
+    const hi      = name ? `Olá ${name}!` : "Olá!"
+
+    if (!authed && !hasKey) return `${hi} Para começar, conecte sua conta e adicione sua chave OpenAI nas configurações.`
+    if (!authed)            return `${hi} Para continuar, conecte sua conta nas configurações.`
+    if (!hasKey)            return `${hi} Adicione sua chave OpenAI nas configurações para ativar a IA.`
+    return `${hi} Posso salvar suas memórias de trabalho, buscar o que você registrou, abrir programas, navegar na web e automatizar tarefas com gravação de cliques. Como posso te ajudar?`
+  }
+
   async function openPanel() {
     if (panelOpenRef.current) return
     panelOpenRef.current = true
     setPanelOpen(true)
     await electronAPI().window.setSize(PANEL_W, PANEL_H + ORB_H)
+    if (!hasGreetedRef.current && savedKeyRef.current) {
+      hasGreetedRef.current = true
+      speak(buildGreeting()).catch(() => {})
+    }
   }
 
   // Auto-scroll to bottom when new messages arrive
@@ -264,6 +285,10 @@ export function RecorderWindow() {
 
   const savedKeyRef = useRef(savedKey)
   useEffect(() => { savedKeyRef.current = savedKey }, [savedKey])
+  const pcNameRef = useRef(pcName)
+  useEffect(() => { pcNameRef.current = pcName }, [pcName])
+  const sessionRef = useRef(session)
+  useEffect(() => { sessionRef.current = session }, [session])
   const currentRecNameRef = useRef(currentRecName)
   useEffect(() => { currentRecNameRef.current = currentRecName }, [currentRecName])
 
@@ -313,18 +338,31 @@ export function RecorderWindow() {
   }, [])
 
   useEffect(() => {
-    loadSession()
+    electronAPI().getUsername().then(setPcName).catch(() => {})
     Promise.all([
-      window.electron.store.get("openaiApiKey"),
-      window.electron.store.get("triggerWord"),
-      window.electron.store.get("selectedTeamId"),
-    ]).then(([key, word, teamId]) => {
-      if (key) setSavedKey(key)
-      if (word) setTriggerWord(word)
-      if (teamId) setSelectedTeamId(teamId)
-    })
+      loadSession(),
+      Promise.all([
+        window.electron.store.get("openaiApiKey"),
+        window.electron.store.get("triggerWord"),
+        window.electron.store.get("selectedTeamId"),
+      ]).then(([key, word, teamId]) => {
+        if (key) setSavedKey(key)
+        if (word) setTriggerWord(word)
+        if (teamId) setSelectedTeamId(teamId)
+      }),
+    ]).finally(() => setIsInitializing(false))
     return electronAPI().onAuthChanged(loadSession)
   }, [loadSession])
+
+  // Auto-speak greeting once when app is ready (no need to open panel)
+  useEffect(() => {
+    if (isInitializing) return
+    if (hasGreetedRef.current) return
+    if (!savedKeyRef.current) return
+    hasGreetedRef.current = true
+    speak(buildGreeting()).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitializing])
 
   useEffect(() => {
     if (!isAuthed) return
@@ -353,6 +391,10 @@ export function RecorderWindow() {
       panelOpenRef.current = true
       setPanelOpen(true)
       await electronAPI().window.setSize(PANEL_W, PANEL_H + ORB_H)
+      if (!hasGreetedRef.current && savedKeyRef.current) {
+        hasGreetedRef.current = true
+        speak(buildGreeting()).catch(() => {})
+      }
     }
   }
 
@@ -367,6 +409,36 @@ export function RecorderWindow() {
     const key = openaiKey.trim() || null
     await window.electron.store.set("openaiApiKey", key)
     setSavedKey(key); setOpenaiKey("")
+  }
+
+  async function handleActivateCode() {
+    const code = codeInput.trim()
+    if (!code) return
+    try {
+      const { token, userId } = await electronAPI().exchangeCode(code)
+      await Promise.all([
+        window.electron.store.set("token", token),
+        window.electron.store.set("userId", userId),
+      ])
+      setCodeInput("")
+      setActiveStep(null)
+      await loadSession()
+      hasGreetedRef.current = true
+      speak(buildGreeting({ authed: true })).catch(() => {})
+    } catch {
+      setError("Código inválido ou expirado")
+    }
+  }
+
+  async function handleSaveApiKeyStep() {
+    const key = openaiKey.trim()
+    if (!key) return
+    await window.electron.store.set("openaiApiKey", key)
+    setSavedKey(key)
+    setOpenaiKey("")
+    setActiveStep(null)
+    hasGreetedRef.current = true
+    speak(buildGreeting({ hasKey: true })).catch(() => {})
   }
 
   const setupMissing = !isAuthed || !savedKey
@@ -417,7 +489,7 @@ export function RecorderWindow() {
             <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: "#d0d0ce", letterSpacing: "0.01em" }}>
               {view === "settings" ? "Configurações" : "Memories"}
             </span>
-            {view === "home" && (
+            {view === "home" && isAuthed && (
               <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: "#333", cursor: "pointer", padding: 4, display: "flex" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "#666")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#333")}
@@ -440,32 +512,158 @@ export function RecorderWindow() {
             {view === "home" && (
               <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 
-                {setupMissing && (
-                  <div style={{ padding: "12px" }}>
-                    <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.06)", background: "#161616" }}>
-                      <p style={{ fontSize: 11, color: "#888", marginBottom: 6, fontWeight: 600 }}>Configure para ativar</p>
-                      {!isAuthed && <p style={{ fontSize: 10, color: "#444", marginBottom: 2 }}>· Conectar conta</p>}
-                      {!savedKey  && <p style={{ fontSize: 10, color: "#444", marginBottom: 2 }}>· Chave OpenAI</p>}
-                      <button onClick={() => setView("settings")} style={{ ...S.btnPrimary, marginTop: 8, fontSize: 11 }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,.1)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
-                      >Configurar agora</button>
-                    </div>
-                  </div>
-                )}
+                {/* nothing — onboarding is handled in messages area */}
 
                 {/* Messages */}
                 <div style={{ flex: 1, padding: "12px 12px 4px", overflowY: "auto" }}>
-                  {messages.length === 0 && !setupMissing && (
-                    <div style={{ textAlign: "center", paddingTop: 40 }}>
-                      <div style={{ fontSize: 11, color: "#2e2e2e", lineHeight: 1.8 }}>
+                  {/* Loading spinner while session+store are being fetched */}
+                  {isInitializing && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 48, gap: 10 }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: "50%",
+                        border: "1.5px solid rgba(255,255,255,0.08)",
+                        borderTopColor: "rgba(255,255,255,0.35)",
+                      }} className="ring-spin" />
+                      <span style={{ fontSize: 10, color: "#333" }}>Carregando...</span>
+                    </div>
+                  )}
+
+                  {/* Onboarding — step list */}
+                  {!isInitializing && setupMissing && activeStep === null && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                      <p style={{ fontSize: 10, color: "#333", marginBottom: 4 }}>Para começar, complete os passos:</p>
+                      {[
+                        { key: "account" as const, done: isAuthed,   num: "1", label: "Conectar conta", hint: "Faça login pelo navegador" },
+                        ...(isAuthed ? [{ key: "apikey" as const, done: !!savedKey, num: "2", label: "Chave OpenAI", hint: "Necessária para a IA funcionar" }] : []),
+                      ].map((step) => (
+                        <button
+                          key={step.key}
+                          onClick={() => {
+                            if (step.done) return
+                            if (step.key === "account") electronAPI().window.openLogin()
+                            setActiveStep(step.key)
+                          }}
+                          style={{
+                            padding: "10px 12px", borderRadius: 10,
+                            background: step.done ? "rgba(74,222,128,0.04)" : "#141414",
+                            border: `1px solid ${step.done ? "rgba(74,222,128,0.15)" : "#242424"}`,
+                            display: "flex", alignItems: "center", gap: 10,
+                            cursor: step.done ? "default" : "pointer",
+                            width: "100%", textAlign: "left",
+                            transition: "border-color .15s, background .15s",
+                          }}
+                          onMouseEnter={e => { if (!step.done) e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)" }}
+                          onMouseLeave={e => { if (!step.done) e.currentTarget.style.borderColor = "#242424" }}
+                        >
+                          <div style={{
+                            width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                            background: step.done ? "rgba(74,222,128,0.15)" : "#1e1e1e",
+                            border: `1px solid ${step.done ? "rgba(74,222,128,0.4)" : "#333"}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, color: step.done ? "rgba(74,222,128,0.9)" : "#555", fontWeight: 700,
+                          }}>
+                            {step.done ? "✓" : step.num}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, color: step.done ? "rgba(74,222,128,0.7)" : "#ccc", fontWeight: 600 }}>{step.label}</div>
+                            <div style={{ fontSize: 10, color: "#333", marginTop: 1 }}>{step.hint}</div>
+                          </div>
+                          {!step.done && <div style={{ fontSize: 14, color: "#333" }}>›</div>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Onboarding — focused: account code */}
+                  {!isInitializing && setupMissing && activeStep === "account" && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 12, paddingTop: 24 }}>
+                      <div style={{ fontSize: 28 }}>🔑</div>
+                      <p style={{ fontSize: 11, color: "#888", textAlign: "center", lineHeight: 1.6, maxWidth: 220 }}>
+                        O navegador abriu. Faça login e cole o código aqui:
+                      </p>
+                      <input
+                        autoFocus
+                        style={{ ...S.input, textAlign: "center", letterSpacing: "0.05em" }}
+                        placeholder="Cole o código..."
+                        value={codeInput}
+                        onChange={e => setCodeInput(e.target.value)}
+                        onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
+                        onBlur={e => (e.target.style.borderColor = "#242424")}
+                        onKeyDown={e => e.key === "Enter" && handleActivateCode()}
+                      />
+                      <button onClick={handleActivateCode} disabled={!codeInput.trim()}
+                        style={{ ...S.btnPrimary, opacity: codeInput.trim() ? 1 : 0.35 }}
+                        onMouseEnter={e => { if (codeInput.trim()) e.currentTarget.style.background = "rgba(255,255,255,.1)" }}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
+                      ><Key size={12} /> Ativar</button>
+                      {error && <p style={{ fontSize: 10, color: "rgba(248,113,113,0.7)" }}>{error}</p>}
+                      <button onClick={() => { setActiveStep(null); setCodeInput(""); setError(null) }}
+                        style={{ background: "none", border: "none", fontSize: 10, color: "#333", cursor: "pointer", marginTop: 4 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = "#666")}
+                        onMouseLeave={e => (e.currentTarget.style.color = "#333")}
+                      >← Voltar</button>
+                    </div>
+                  )}
+
+                  {/* Onboarding — focused: API key */}
+                  {!isInitializing && setupMissing && activeStep === "apikey" && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 12, paddingTop: 24 }}>
+                      <div style={{ fontSize: 28 }}>🤖</div>
+                      <p style={{ fontSize: 11, color: "#888", textAlign: "center", lineHeight: 1.6, maxWidth: 220 }}>
+                        Cole sua chave OpenAI para ativar a inteligência artificial:
+                      </p>
+                      <input
+                        autoFocus type="password"
+                        style={{ ...S.input, fontFamily: "monospace" }}
+                        placeholder="sk-..."
+                        value={openaiKey}
+                        onChange={e => setOpenaiKey(e.target.value)}
+                        onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
+                        onBlur={e => (e.target.style.borderColor = "#242424")}
+                        onKeyDown={e => e.key === "Enter" && handleSaveApiKeyStep()}
+                      />
+                      <button onClick={handleSaveApiKeyStep} disabled={!openaiKey.trim()}
+                        style={{ ...S.btnPrimary, opacity: openaiKey.trim() ? 1 : 0.35 }}
+                        onMouseEnter={e => { if (openaiKey.trim()) e.currentTarget.style.background = "rgba(255,255,255,.1)" }}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
+                      ><Key size={12} /> Salvar chave</button>
+                      <button onClick={() => { setActiveStep(null); setOpenaiKey("") }}
+                        style={{ background: "none", border: "none", fontSize: 10, color: "#333", cursor: "pointer", marginTop: 4 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = "#666")}
+                        onMouseLeave={e => (e.currentTarget.style.color = "#333")}
+                      >← Voltar</button>
+                    </div>
+                  )}
+
+                  {/* Welcome screen — shown when ready, no messages, setup complete */}
+                  {!isInitializing && messages.length === 0 && !setupMissing && (
+                    <div style={{ paddingTop: 16 }}>
+                      <p style={{ fontSize: 11, color: "#3a3a3a", marginBottom: 10, textAlign: "center" }}>
                         {triggerWord
-                          ? <>Diga <span style={{ color: "#444", fontStyle: "italic" }}>"{triggerWord}"</span> para começar</>
+                          ? <>Diga <span style={{ color: "#555", fontStyle: "italic" }}>"{triggerWord}"</span> para começar</>
                           : "Fale algo para começar"
                         }
-                      </div>
-                      <div style={{ fontSize: 10, color: "#242424", marginTop: 6 }}>
-                        Crie memórias ou pergunte sobre o que registrou
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[
+                          { icon: "🧠", label: "Salvar memória", example: "Lembra que resolvi o bug do login hoje" },
+                          { icon: "🔍", label: "Buscar memórias", example: "O que fizemos semana passada no projeto?" },
+                          { icon: "🖥️", label: "Abrir programas", example: "Abre o VS Code pra mim" },
+                          { icon: "🌐", label: "Navegar na web", example: "Vai para github.com" },
+                          { icon: "🤖", label: "Automatizar tarefas", example: "Grava essa sequência de cliques" },
+                        ].map((cap) => (
+                          <div key={cap.label} style={{
+                            padding: "7px 10px", borderRadius: 8,
+                            background: "#141414", border: "1px solid #1e1e1e",
+                            display: "flex", alignItems: "center", gap: 8,
+                          }}>
+                            <span style={{ fontSize: 13 }}>{cap.icon}</span>
+                            <div>
+                              <div style={{ fontSize: 10, color: "#555", fontWeight: 600, marginBottom: 1 }}>{cap.label}</div>
+                              <div style={{ fontSize: 9, color: "#2e2e2e", fontStyle: "italic" }}>"{cap.example}"</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -568,7 +766,7 @@ export function RecorderWindow() {
 
             {/* SETTINGS */}
             {view === "settings" && (
-              <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
                   <span style={S.label}>Modo de escuta</span>
 
@@ -606,15 +804,13 @@ export function RecorderWindow() {
                     </span>
                   </div>
 
-                  {/* Trigger word input (only shown if trigger mode active) */}
-                  {(triggerWord || triggerInput !== undefined) && (
+                  {/* Trigger word input — only show when trigger mode is active */}
+                  {triggerWord !== null && (
                     <>
                       <p style={{ fontSize: 10, color: "#333", lineHeight: 1.6, marginBottom: 6 }}>
-                        {triggerWord
-                          ? <>Gatilho atual: <span style={{ color: "#555" }}>"{triggerWord}"</span>. Após ouvi-lo, permanece ativa por 30s para perguntas.</>
-                          : "Após ativar, permanece ouvindo por 30s para perguntas de acompanhamento."}
+                        Gatilho atual: <span style={{ color: "#555" }}>"{triggerWord}"</span>
                       </p>
-                      <input style={S.input} placeholder={triggerWord ?? "Ex: Jarvis, Hey, Memories..."} value={triggerInput}
+                      <input style={S.input} placeholder="Alterar palavra-gatilho..." value={triggerInput}
                         onChange={e => setTriggerInput(e.target.value)}
                         onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
                         onBlur={e => (e.target.style.borderColor = "#242424")}
@@ -622,15 +818,22 @@ export function RecorderWindow() {
                       <button onClick={saveTriggerWord} style={{ ...S.btnPrimary, marginTop: 6, fontSize: 11 }}
                         onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,.1)")}
                         onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
-                      ><Key size={11} /> Salvar palavra</button>
+                      ><Key size={11} /> Salvar</button>
                     </>
                   )}
                 </div>
 
                 <div>
-                  <span style={S.label}>Chave OpenAI</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                    <span style={S.label}>Chave OpenAI</span>
+                    {savedKey && (
+                      <span style={{ fontSize: 9, color: "rgba(74,222,128,0.7)", display: "flex", alignItems: "center", gap: 3, fontWeight: 600 }}>
+                        <CheckCircle2 size={9} /> Ativa
+                      </span>
+                    )}
+                  </div>
                   <input style={{ ...S.input, fontFamily: "monospace" }} type="password"
-                    placeholder={savedKey ? "••••••••••••" : "sk-..."}
+                    placeholder={savedKey ? "Nova chave para substituir..." : "sk-..."}
                     value={openaiKey} onChange={e => setOpenaiKey(e.target.value)}
                     onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
                     onBlur={e => (e.target.style.borderColor = "#242424")}
@@ -638,10 +841,10 @@ export function RecorderWindow() {
                   <button onClick={saveApiKey} style={{ ...S.btnPrimary, marginTop: 6, fontSize: 11 }}
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,.1)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
-                  ><Key size={11} /> Salvar chave</button>
+                  ><Key size={11} /> {savedKey ? "Atualizar chave" : "Salvar chave"}</button>
                 </div>
 
-                {isAuthed && teams.length > 0 && (
+                {teams.length > 0 && (
                   <div>
                     <span style={S.label}>Time destino</span>
                     <select value={selectedTeamId ?? ""}
@@ -650,32 +853,27 @@ export function RecorderWindow() {
                     >
                       {teams.map(t => <option key={t.id} value={t.id}>{t.name}{t.isPersonal ? " (pessoal)" : ""}</option>)}
                     </select>
-                    <p style={{ fontSize: 10, color: "#2e2e2e", marginTop: 4 }}>Memórias salvas neste time por voz</p>
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 12 }}>
-                  {isAuthed ? (
-                    <>
-                      <p style={{ fontSize: 11, color: "#555", marginBottom: 8 }}>
-                        {(session as Session).user.name}
-                        <span style={{ color: "#333", fontSize: 10 }}> · {(session as Session).user.email}</span>
-                      </p>
-                      <button onClick={async () => {
-                        stopListening()
-                        await Promise.all([window.electron.store.set("token", null), window.electron.store.set("userId", null)])
-                        setSession(null)
-                      }} style={{ ...S.btn, fontSize: 11 }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "#1e1e1e"; e.currentTarget.style.color = "#d0d0ce" }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.color = "#aaa" }}
-                      ><LogOut size={12} /> Sair da conta</button>
-                    </>
-                  ) : (
-                    <button onClick={() => electronAPI().window.openLogin()} style={{ ...S.btnPrimary, fontSize: 11 }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,.1)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,.06)")}
-                    ><LogIn size={12} /> Conectar conta</button>
-                  )}
+                {/* Account info + sign out */}
+                <div style={{ borderTop: "1px solid #1a1a1a", paddingTop: 10, marginTop: 4 }}>
+                  <p style={{ fontSize: 10, color: "#444", marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {(session as Session).user.name} · <span style={{ color: "#333" }}>{(session as Session).user.email}</span>
+                  </p>
+                  <button onClick={async () => {
+                    stopListening()
+                    await Promise.all([window.electron.store.set("token", null), window.electron.store.set("userId", null)])
+                    setSession(null)
+                    setView("home")
+                    setActiveStep(null)
+                    messagesRef.current = []
+                    setMessages([])
+                    hasGreetedRef.current = false
+                  }} style={{ ...S.btn, fontSize: 11 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#1e1e1e"; e.currentTarget.style.color = "#d0d0ce" }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.color = "#aaa" }}
+                  ><LogOut size={12} /> Sair da conta</button>
                 </div>
               </div>
             )}

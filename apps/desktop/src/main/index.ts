@@ -272,6 +272,11 @@ ipcMain.handle("open-web", (_e, p: string) => {
   return shell.openExternal(url)
 })
 
+ipcMain.handle("system:username", () => {
+  const os = require("os") as typeof import("os")
+  return os.userInfo().username
+})
+
 ipcMain.handle("system:open-app", (_e, appName: string) => {
   return new Promise<void>((resolve) => {
     // Windows: `start ""` hands off to shell — works for installed apps by name
