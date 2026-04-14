@@ -57,7 +57,7 @@ export default async function MemoriesPage({ searchParams }: Props) {
             {t("memories.subtitle")}
           </p>
         </div>
-        <CreateProjectButton teamId={teamId} lang={lang} />
+        <CreateProjectButton teamId={teamId} />
       </div>
 
       {/* Stats */}

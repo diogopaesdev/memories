@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const data = updateProjectSchema.parse(body)
     await db.collection("projects").doc(id).update({ ...data, updatedAt: new Date() })
 
-    return NextResponse.json({ id, ...project, ...data })
+    return NextResponse.json({ ...project, ...data })
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
