@@ -22,6 +22,16 @@ contextBridge.exposeInMainWorld("electron", {
   checkSession: () => ipcRenderer.invoke("auth:check-session"),
   transcribe: (audioBuffer: ArrayBuffer, apiKey: string) => ipcRenderer.invoke("audio:transcribe", audioBuffer, apiKey),
   processVoice: (transcript: string, openaiApiKey: string | null) => ipcRenderer.invoke("ai:process-voice", transcript, openaiApiKey),
+  processChat: (transcript: string, history: unknown[], openaiApiKey: string | null) => ipcRenderer.invoke("ai:chat", transcript, history, openaiApiKey),
+  tts: (text: string, apiKey: string) => ipcRenderer.invoke("tts:speak", text, apiKey),
+  openApp: (appName: string) => ipcRenderer.invoke("system:open-app", appName),
+  mouseAction: (action: string, x: number, y: number, extra?: number) => ipcRenderer.invoke("mouse:action", action, x, y, extra),
+  recording: {
+    start:  (name: string) => ipcRenderer.invoke("mouse:start-recording", name),
+    stop:   (name: string) => ipcRenderer.invoke("mouse:stop-recording", name),
+    replay: (name: string) => ipcRenderer.invoke("mouse:replay", name),
+    list:   ()             => ipcRenderer.invoke("mouse:list-recordings"),
+  },
   realtime: {
     start: (apiKey: string) => ipcRenderer.invoke("realtime:start", apiKey),
     sendAudio: (audio: string) => ipcRenderer.send("realtime:audio", audio),

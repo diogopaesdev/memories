@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react"
-import { ExternalLink, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { checkSession } from "@/lib/api"
 import { electronAPI } from "@/lib/electron"
 
 export function LoginWindow() {
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]   = useState(false)
   const [checking, setChecking] = useState(true)
   const [webAppUrl, setWebAppUrl] = useState("http://localhost:3000")
 
@@ -12,7 +12,6 @@ export function LoginWindow() {
     async function init() {
       const url = await window.electron.store.get("webAppUrl")
       if (url) setWebAppUrl(url)
-
       const session = await checkSession()
       if (session?.user) {
         await window.electron.store.set("token", session.session?.token ?? "session")
@@ -27,8 +26,6 @@ export function LoginWindow() {
   async function handleOpenBrowser() {
     setLoading(true)
     await electronAPI().openWeb("/login")
-
-    // Poll for session after opening browser
     const interval = setInterval(async () => {
       const session = await checkSession()
       if (session?.user) {
@@ -39,64 +36,117 @@ export function LoginWindow() {
         electronAPI().window.closeLogin()
       }
     }, 2000)
-
-    // Stop polling after 5 minutes
-    setTimeout(() => {
-      clearInterval(interval)
-      setLoading(false)
-    }, 300_000)
+    setTimeout(() => { clearInterval(interval); setLoading(false) }, 300_000)
   }
 
   if (checking) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div style={{
+        height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        background: "#0a0a0a",
+      }}>
+        <Loader2 size={20} color="rgba(255,255,255,0.2)" className="animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
-          <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-bold text-slate-900">ProjectsReport</h1>
-        <p className="text-sm text-slate-500 mt-2">App de captura por voz</p>
+    <div style={{
+      height: "100vh", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      background: "#0a0a0a", padding: 28,
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+      userSelect: "none",
+    }}>
+      {/* Logo mark */}
+      <div style={{ marginBottom: 24, position: "relative", width: 52, height: 52 }}>
+        {/* Rounded square bg */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: 14,
+          background: "#161616", border: "1px solid rgba(255,255,255,0.06)",
+        }} />
+        {/* Outer ring */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          width: 34, height: 34,
+          transform: "translate(-50%,-50%)",
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.2)",
+        }} />
+        {/* Middle ring */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          width: 20, height: 20,
+          transform: "translate(-50%,-50%)",
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.35)",
+        }} />
+        {/* Center dot */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          width: 7, height: 7,
+          transform: "translate(-50%,-50%)",
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.7)",
+        }} />
       </div>
 
-      <div className="w-full max-w-xs bg-white rounded-2xl shadow-lg p-6 border border-slate-100">
-        <h2 className="text-base font-semibold text-slate-800 mb-1">Entrar na conta</h2>
-        <p className="text-sm text-slate-500 mb-5">
-          Seu browser será aberto para fazer login com Google.
-          Retorne ao app após entrar.
+      <h1 style={{ fontSize: 17, fontWeight: 700, color: "#d0d0ce", marginBottom: 4, letterSpacing: "-0.01em" }}>
+        Memories
+      </h1>
+      <p style={{ fontSize: 11, color: "#333", marginBottom: 28 }}>
+        Captura por voz
+      </p>
+
+      {/* Card */}
+      <div style={{
+        width: "100%", maxWidth: 240,
+        background: "#111", borderRadius: 14,
+        border: "1px solid #1e1e1e", padding: 18,
+      }}>
+        <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 14 }}>
+          Seu browser será aberto para fazer login com Google. Retorne ao app após entrar.
         </p>
 
         <button
           onClick={handleOpenBrowser}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{
+            width: "100%", padding: "9px 12px", borderRadius: 9,
+            border: "1px solid rgba(255,255,255,.08)",
+            background: loading ? "#161616" : "rgba(255,255,255,.05)",
+            color: loading ? "#444" : "#888", fontSize: 12, cursor: loading ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            transition: "background .15s, color .15s",
+          }}
+          onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = "rgba(255,255,255,.09)"; e.currentTarget.style.color = "#d0d0ce" }}}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,.05)"; e.currentTarget.style.color = "#888" }}
         >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <ExternalLink className="w-4 h-4" />
-          )}
+          {loading
+            ? <Loader2 size={13} className="animate-spin" />
+            : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            )
+          }
           {loading ? "Aguardando login..." : "Abrir browser para login"}
         </button>
 
         {loading && (
-          <p className="text-center text-xs text-slate-400 mt-3">
-            Após fazer login no browser, o app será atualizado automaticamente.
+          <p style={{ fontSize: 10, color: "#2a2a2a", marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
+            Após fazer login no browser, o app<br />será atualizado automaticamente.
           </p>
         )}
       </div>
 
-      <p className="text-xs text-slate-400 mt-6 text-center">
-        Certifique-se que o painel web está rodando em<br />
-        <span className="font-mono">{webAppUrl}</span>
+      <p style={{ fontSize: 10, color: "#222", marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
+        Painel em <span style={{ fontFamily: "monospace" }}>{webAppUrl}</span>
       </p>
     </div>
   )

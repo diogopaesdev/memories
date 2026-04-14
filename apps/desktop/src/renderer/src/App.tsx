@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { RecorderWindow } from "./components/recorder-window"
 import { LoginWindow } from "./components/login-window"
 
@@ -12,7 +12,6 @@ function getRoute(): Route {
 
 export default function App() {
   const [route] = useState<Route>(getRoute)
-
   if (route === "login") return <LoginWindow />
   return <RecorderWindow />
 }

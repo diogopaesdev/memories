@@ -11,6 +11,29 @@ export interface VoiceResult {
   isNewProject: boolean
 }
 
+export interface ChatResponse {
+  action: "create" | "search" | "chat"
+  reply: string
+  openUrl?: string
+  openAppName?: string
+  mouseAction?: { type: string; x: number; y: number; scrollAmount?: number }
+  recordingAction?: "start" | "stop" | "replay"
+  recordingName?: string
+  data?: {
+    reportId?: string
+    projectId?: string
+    projectName?: string
+    title?: string
+    isNewProject?: boolean
+    memories?: { title: string; projectName: string; date: string; snippet?: string }[]
+  }
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
 async function getWebAppUrl(): Promise<string> {
   const url = await window.electron.store.get("webAppUrl")
   return url ?? "http://localhost:3000"

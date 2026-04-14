@@ -8,9 +8,14 @@ interface UseContinuousListenerReturn {
   capturedText: string
   lastError: string | null
   debugLog: string[]
+  inConversationWindow: boolean
   startListening: () => Promise<void>
   stopListening: () => void
 }
+
+// After the trigger word is detected, stay in "conversation window" for this
+// long without requiring the trigger word again for follow-up messages.
+const CONVERSATION_WINDOW_MS = 30_000
 
 export function useContinuousListener(
   triggerWord: string | null,
@@ -22,6 +27,7 @@ export function useContinuousListener(
   const [capturedText, setCaptured] = useState("")
   const [lastError, setLastError] = useState<string | null>(null)
   const [debugLog, setDebugLog] = useState<string[]>([])
+  const [inConversationWindow, setInConversationWindow] = useState(false)
 
   function dbg(msg: string) {
     const t = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -40,13 +46,40 @@ export function useContinuousListener(
   const savingRef = useRef(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Agenda save após SAVE_DELAY_MS de silêncio.
-  // Cada nova fala em modo ativo reseta o timer.
-  const SAVE_DELAY_MS = 6000
+  // ── Conversation window ─────────────────────────────────────────────────
+  // After trigger is detected, stay "open" for CONVERSATION_WINDOW_MS so the
+  // user can ask follow-up questions without saying the trigger word again.
+  const convWindowRef = useRef(false)
+  const convTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function openConversationWindow() {
+    convWindowRef.current = true
+    setInConversationWindow(true)
+    resetConversationTimer()
+  }
+
+  function resetConversationTimer() {
+    if (convTimerRef.current) clearTimeout(convTimerRef.current)
+    convTimerRef.current = setTimeout(() => {
+      convWindowRef.current = false
+      setInConversationWindow(false)
+      convTimerRef.current = null
+      dbg("Janela de conversa encerrada")
+    }, CONVERSATION_WINDOW_MS)
+  }
+
+  function closeConversationWindow() {
+    if (convTimerRef.current) { clearTimeout(convTimerRef.current); convTimerRef.current = null }
+    convWindowRef.current = false
+    setInConversationWindow(false)
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   function scheduleSave() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    dbg(`Timer: ${SAVE_DELAY_MS / 1000}s para salvar`)
-    saveTimerRef.current = setTimeout(() => { doSave() }, SAVE_DELAY_MS)
+    // Shorter delay when in conversation window or no trigger — feels more responsive
+    const delay = (triggerRef.current && !convWindowRef.current) ? 4000 : 1200
+    saveTimerRef.current = setTimeout(() => { doSave() }, delay)
   }
   function cancelSaveTimer() {
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
@@ -80,10 +113,12 @@ export function useContinuousListener(
     if (!text) { setListenerState("passive"); return }
     savingRef.current = true
     setListenerState("saving")
-    dbg(`Salvando: "${text.slice(0, 40)}..."`)
+    dbg(`Processando: "${text.slice(0, 40)}..."`)
     try {
       await onCommandRef.current(text)
-    } catch { /* tratado em onCommand */ } finally {
+      // After command completes, extend the conversation window
+      if (convWindowRef.current) resetConversationTimer()
+    } catch { /* handled in onCommand */ } finally {
       savingRef.current = false
       if (activeRef.current) setListenerState("passive")
     }
@@ -100,6 +135,7 @@ export function useContinuousListener(
 
       case "input_audio_buffer.speech_started":
         dbg("Fala detectada")
+        if (isModeActive.current) cancelSaveTimer()
         break
 
       case "conversation.item.input_audio_transcription.delta":
@@ -116,26 +152,65 @@ export function useContinuousListener(
 
         const trigger = (triggerRef.current ?? "").toLowerCase().trim()
 
+        // ── Noise filter ─────────────────────────────────────────
+        // Ignore very short or common filler utterances to avoid responding to
+        // background noise, ambient audio, or accidental sounds.
+        const wordCount = text.split(/\s+/).filter(Boolean).length
+        const NOISE_WORDS = new Set([
+          "e aí", "eai", "eaí", "oi", "olá", "ola", "hey", "ah", "eh", "hm", "hmm",
+          "tá", "ta", "né", "ne", "sim", "não", "nao", "ok", "okay", "certo",
+          "tchau", "bye", "obrigado", "obrigada", "ok ok", "tudo bem",
+        ])
+        const lc = text.toLowerCase()
+        const isFiller = NOISE_WORDS.has(lc) || (wordCount < 3 && lc.length < 18 && !trigger)
+        if (isFiller) {
+          dbg(`Ignorado (ruído/preenchimento): "${text}"`)
+          break
+        }
+        // ─────────────────────────────────────────────────────────
+
+        // ── Mode 1: no trigger word — always active ──────────────
+        if (!trigger) {
+          isModeActive.current = true
+          setListenerState("active")
+          capturedRef.current = text
+          setCaptured(text)
+          scheduleSave()
+          break
+        }
+
+        // ── Mode 2: inside conversation window ───────────────────
+        // Trigger was spoken recently; follow-up messages bypass the trigger check
+        if (convWindowRef.current && !isModeActive.current) {
+          isModeActive.current = true
+          setListenerState("active")
+          capturedRef.current = text
+          setCaptured(text)
+          resetConversationTimer() // keep window alive on each message
+          scheduleSave()
+          break
+        }
+
+        // ── Mode 3: already mid-capture — accumulate ─────────────
         if (isModeActive.current) {
-          // Já está ativo: acumula e reseta o timer de silêncio
           capturedRef.current = (capturedRef.current + " " + text).trim()
           setCaptured(capturedRef.current)
           scheduleSave()
           break
         }
 
-        if (!trigger) break
+        // ── Mode 4: waiting for trigger word ─────────────────────
         const idx = text.toLowerCase().indexOf(trigger)
         if (idx === -1) break
 
-        // Gatilho detectado → ativa modo (fica verde) e acumula o que vem depois
+        // Trigger detected → open conversation window
         isModeActive.current = true
         setListenerState("active")
+        openConversationWindow()
         const after = text.slice(idx + trigger.length).trim()
         capturedRef.current = after
         setCaptured(after)
-        dbg("Gatilho! Aguardando comando...")
-        // Se já tem conteúdo após o gatilho, agenda save; senão espera próxima fala
+        dbg(`Gatilho! Janela de conversa aberta (${CONVERSATION_WINDOW_MS / 1000}s)`)
         if (after) scheduleSave()
         break
       }
@@ -166,13 +241,11 @@ export function useContinuousListener(
     dbg("Iniciando...")
 
     try {
-      // Microfone
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
       dbg("Microfone OK")
 
-      // Conectar WebSocket via main process (tem acesso à rede sem restrições)
-      const cleanup = window.electron.realtime.onEvent(handleRealtimeEvent)
+      window.electron.realtime.onEvent(handleRealtimeEvent)
 
       dbg("Conectando ao OpenAI...")
       await window.electron.realtime.start(key)
@@ -186,7 +259,6 @@ export function useContinuousListener(
       setInterimText("")
       setListenerState("passive")
 
-      // AudioContext 24kHz → PCM16 → main → OpenAI
       const ctx = new AudioContext({ sampleRate: 24000 })
       audioCtxRef.current = ctx
       const source = ctx.createMediaStreamSource(stream)
@@ -203,9 +275,6 @@ export function useContinuousListener(
         const audio = pcm16Base64(ev.inputBuffer.getChannelData(0))
         window.electron.realtime.sendAudio(audio)
       }
-
-      // Retornar cleanup do listener de eventos
-      return cleanup
     } catch (err) {
       const e = err as Error
       dbg(`Erro: ${e.message}`)
@@ -220,6 +289,7 @@ export function useContinuousListener(
 
   const stopListening = useCallback(() => {
     cancelSaveTimer()
+    closeConversationWindow()
     activeRef.current = false
     savingRef.current = false
     processorRef.current?.disconnect()
@@ -235,9 +305,9 @@ export function useContinuousListener(
     setCaptured("")
     setInterimText("")
     setListenerState("passive")
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { stopListening() }, [stopListening])
 
-  return { listenerState, interimText, capturedText, lastError, debugLog, startListening, stopListening }
+  return { listenerState, interimText, capturedText, lastError, debugLog, inConversationWindow, startListening, stopListening }
 }
