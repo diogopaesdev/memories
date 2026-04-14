@@ -1,9 +1,12 @@
 name: Release Desktop App
 
+# Mantido apenas para trigger manual via workflow_dispatch
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (ex: v0.0.5)'
+        required: true
 
 permissions:
   contents: write
@@ -24,11 +27,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
@@ -67,6 +70,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag }}
           files: artifacts/**
           generate_release_notes: true
         env:
