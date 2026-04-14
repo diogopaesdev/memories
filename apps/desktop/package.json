@@ -56,8 +56,16 @@
       "icon": "public/icon.ico"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "public/icon.png"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "public/icon.png",
+      "minimumSystemVersion": "13.0"
     },
     "linux": {
       "target": "AppImage",
