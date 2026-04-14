@@ -18,7 +18,9 @@
         "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
         "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
         "NEXT_PUBLIC_APP_URL",
-        "GITHUB_REPO"
+        "GITHUB_REPO",
+        "VITE_WEB_APP_URL",
+        "VITE_GOOGLE_CLIENT_ID"
       ]
     },
     "dev": {
