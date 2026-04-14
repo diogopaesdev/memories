@@ -46,6 +46,8 @@ const ORB_H = 50
 const PANEL_W = 300
 const PANEL_H = 420
 
+const isMac = process.platform === "darwin"
+
 function createRecorderWindow() {
   recorderWindow = new BrowserWindow({
     width: ORB_W, height: ORB_H,
@@ -53,9 +55,11 @@ function createRecorderWindow() {
     resizable: false,
     alwaysOnTop: true, skipTaskbar: true,
     frame: false,
-    transparent: false,
-    backgroundColor: "#0f0f0f",
-    hasShadow: true, roundedCorners: true,
+    // macOS: transparent is required for frameless windows to render content
+    transparent: isMac,
+    backgroundColor: isMac ? "#00000000" : "#0f0f0f",
+    hasShadow: true,
+    roundedCorners: true,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.js"),
@@ -118,8 +122,9 @@ ipcMain.handle("window:close-login", () => loginWindow?.close())
 ipcMain.handle("window:set-size", (_e, w: number, h: number) => {
   if (!recorderWindow) return
   positionBottomRight(w, h)
-  recorderWindow.setSkipTaskbar(true)
-  recorderWindow.setAlwaysOnTop(true, "screen-saver")
+  if (!isMac) recorderWindow.setSkipTaskbar(true)
+  // macOS: "screen-saver" level blocks mouse events — use "pop-up-menu" instead
+  recorderWindow.setAlwaysOnTop(true, isMac ? "pop-up-menu" : "screen-saver")
   if (!recorderWindow.isVisible()) recorderWindow.show()
   recorderWindow.moveTop()
 })
