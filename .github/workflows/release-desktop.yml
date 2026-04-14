@@ -36,12 +36,38 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build shared package
-        run: npx tsc --project packages/shared/tsconfig.json --noEmit || true
-
-      - name: Build and publish desktop app
+      - name: Build desktop app
         working-directory: apps/desktop
-        run: npx vite build && npx electron-builder --publish always
+        run: npx vite build && npx electron-builder --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_WEB_APP_URL: ${{ vars.WEB_APP_URL || 'https://projectsreport.vercel.app' }}
+          VITE_WEB_APP_URL: ${{ vars.WEB_APP_URL || 'https://memories.app' }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/latest*.yml
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
