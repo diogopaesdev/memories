@@ -27,14 +27,16 @@ async function getLatestRelease(): Promise<GitHubRelease | null> {
   if (!GITHUB_REPO) return null
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`,
       {
         headers: { Accept: "application/vnd.github+json" },
         next: { revalidate: 300 },
       }
     )
     if (!res.ok) return null
-    return res.json()
+    const releases: GitHubRelease[] = await res.json()
+    // Return first release that has downloadable assets (ignores draft/empty releases)
+    return releases.find((r) => r.assets.length > 0) ?? null
   } catch {
     return null
   }

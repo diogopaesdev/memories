@@ -106,5 +106,6 @@ jobs:
           tag_name: ${{ needs.tag.outputs.tag }}
           files: artifacts/**
           generate_release_notes: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
