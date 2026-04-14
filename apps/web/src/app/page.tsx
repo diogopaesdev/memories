@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Download } from "lucide-react"
+import { GoogleLoginButton } from "@/components/auth/google-login-button"
 
 export default function HomePage() {
   return (
@@ -20,14 +21,18 @@ export default function HomePage() {
         Capture e recupere suas memórias de trabalho por voz.
       </p>
 
-      <Link
-        href="/download"
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-opacity hover:opacity-85"
-        style={{ background: "#7c6af0", color: "#fff" }}
-      >
-        <Download className="w-4 h-4" />
-        Baixar app
-      </Link>
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <Link
+          href="/download"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-opacity hover:opacity-85"
+          style={{ background: "#7c6af0", color: "#fff" }}
+        >
+          <Download className="w-4 h-4" />
+          Baixar app
+        </Link>
+
+        <GoogleLoginButton />
+      </div>
 
       <footer className="absolute bottom-8 text-xs" style={{ color: "#3a3a37" }}>
         Memories · {new Date().getFullYear()}
