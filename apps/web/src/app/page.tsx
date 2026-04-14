@@ -1,7 +1,13 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Download } from "lucide-react"
+import { getServerSession } from "@/lib/session"
+import { GoogleLoginButton } from "@/components/auth/google-login-button"
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await getServerSession()
+  if (session) redirect("/memories")
+
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center text-white px-6"
@@ -31,13 +37,7 @@ export default function HomePage() {
           Baixar app
         </Link>
 
-        <Link
-          href="/login"
-          className="inline-flex items-center justify-center px-6 py-3 rounded-xl text-sm font-semibold transition-colors hover:text-white"
-          style={{ border: "1px solid #2d2d2a", color: "#9a9590" }}
-        >
-          Entrar
-        </Link>
+        <GoogleLoginButton />
       </div>
 
       <footer className="absolute bottom-8 text-xs" style={{ color: "#3a3a37" }}>
