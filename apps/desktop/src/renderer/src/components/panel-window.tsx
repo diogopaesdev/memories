@@ -85,7 +85,6 @@ export function PanelWindow() {
 
   function close() {
     send({ type: "panelClosed" })
-    electronAPI().window.togglePanel(false)
   }
 
   const { listenerState, capturedText, interimText, result, error, lastError,

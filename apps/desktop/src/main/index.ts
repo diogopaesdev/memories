@@ -118,7 +118,7 @@ function showOrbContextMenu() {
 ipcMain.handle("store:get", (_e, key: keyof StoreSchema) => store.get(key))
 ipcMain.handle("store:set", (_e, key: keyof StoreSchema, value: string | null) => { store.set(key, value as never) })
 
-ipcMain.handle("window:close-login", () => loginWindow?.close())
+ipcMain.handle("window:close-login", () => { (loginWindow as BrowserWindow | null)?.close() })
 ipcMain.handle("window:set-size", (_e, w: number, h: number) => {
   if (!recorderWindow) return
   positionBottomRight(w, h)
@@ -456,8 +456,8 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
 })
 
 app.whenReady().then(() => {
-  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === "media" || permission === "microphone")
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === "media" || permission === "microphone"))
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ["wss://api.openai.com/*", "https://api.openai.com/*"] },
     (details, callback) => {
@@ -482,5 +482,5 @@ app.whenReady().then(() => {
   app.on("activate", () => { if (!recorderWindow) createRecorderWindow() })
 })
 
-app.on("window-all-closed", (e: Event) => e.preventDefault())
+app.on("window-all-closed", () => { /* keep alive in tray */ })
 app.on("will-quit", () => globalShortcut.unregisterAll())

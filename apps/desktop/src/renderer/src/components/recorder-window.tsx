@@ -903,7 +903,8 @@ export function RecorderWindow() {
           background: orbState === "active" ? "#141414" : "#0f0f0f",
           border: "none", cursor: "pointer",
           transition: "background .3s",
-          WebkitAppRegion: "drag" as never,
+          // @ts-ignore
+          WebkitAppRegion: "drag",
         }}
         className={isSpeaking ? "pill-speaking" : orbState === "active" ? "pill-active" : ""}
         onMouseEnter={e => (e.currentTarget.style.background = "#161616")}
@@ -911,7 +912,8 @@ export function RecorderWindow() {
       >
         <LogoIcon size={26} listenerState={orbState} isSpeaking={isSpeaking} />
 
-        <div style={{ flex: 1, textAlign: "left", WebkitAppRegion: "no-drag" as never }}>
+        {/* @ts-ignore */}
+        <div style={{ flex: 1, textAlign: "left", WebkitAppRegion: "no-drag" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)", letterSpacing: "-0.01em" }}>
             Memories
           </span>

@@ -14,7 +14,7 @@ export function LoginWindow() {
       if (url) setWebAppUrl(url)
       const session = await checkSession()
       if (session?.user) {
-        await window.electron.store.set("token", session.session?.token ?? "session")
+        await window.electron.store.set("token", "session")
         await window.electron.store.set("userId", session.user.id)
         electronAPI().window.closeLogin()
       }
@@ -30,7 +30,7 @@ export function LoginWindow() {
       const session = await checkSession()
       if (session?.user) {
         clearInterval(interval)
-        await window.electron.store.set("token", session.session?.token ?? "session")
+        await window.electron.store.set("token", "session")
         await window.electron.store.set("userId", session.user.id)
         await electronAPI().notify("Login realizado!", `Bem-vindo, ${session.user.name}`)
         electronAPI().window.closeLogin()
