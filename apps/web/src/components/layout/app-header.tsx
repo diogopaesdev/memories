@@ -100,24 +100,25 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
 
   return (
     <>
-      <header
-        className="sticky top-0 z-40 border-b"
-        style={{ background: "var(--mem-bg)", borderColor: "var(--mem-border)" }}
-      >
+      <header className="fixed top-0 left-0 right-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
 
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
-              <rect width="40" height="40" rx="9" fill="var(--mem-ink)" />
-              <circle cx="20" cy="20" r="3.5" fill="var(--mem-bg)" />
-              <circle cx="20" cy="20" r="8.5" stroke="var(--mem-bg)" strokeWidth="1.5" opacity="0.55" />
-              <circle cx="20" cy="20" r="14" stroke="var(--mem-bg)" strokeWidth="1" opacity="0.22" />
-            </svg>
-            <span className="font-semibold text-sm tracking-tight" style={{ color: "var(--mem-ink)" }}>
-              Memories
-            </span>
-          </div>
+          {/* Left — Logo + Team switcher */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Logo */}
+            <div className="flex items-center gap-2.5">
+              <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
+                <rect width="40" height="40" rx="9" fill="var(--mem-ink)" />
+                <circle cx="20" cy="20" r="3.5" fill="var(--mem-bg)" />
+                <circle cx="20" cy="20" r="8.5" stroke="var(--mem-bg)" strokeWidth="1.5" opacity="0.55" />
+                <circle cx="20" cy="20" r="14" stroke="var(--mem-bg)" strokeWidth="1" opacity="0.22" />
+              </svg>
+              <span className="font-semibold text-sm tracking-tight" style={{ color: "var(--mem-ink)" }}>
+                Memories
+              </span>
+            </div>
+
+            <div className="w-px h-4 opacity-20" style={{ background: "var(--mem-ink)" }} />
 
           {/* Team switcher */}
           <DropdownMenu>
@@ -169,6 +170,7 @@ export function AppHeader({ user, teams }: AppHeaderProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>{/* end Left */}
 
           {/* Right */}
           <div className="flex items-center gap-2">

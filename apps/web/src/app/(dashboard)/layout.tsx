@@ -12,17 +12,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen" style={{ background: "var(--mem-bg)" }}>
-      <Suspense
-        fallback={
-          <div
-            className="h-14 border-b"
-            style={{ background: "var(--mem-header-bg)", borderColor: "var(--mem-border)" }}
-          />
-        }
-      >
+      <Suspense fallback={<div className="h-14" />}>
         <AppHeader user={session.user} teams={teams} />
       </Suspense>
-      <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
+      {/* pt-14 compensates for the fixed header (h-14 = 56px) */}
+      <main className="max-w-6xl mx-auto px-6 pt-14 py-8">{children}</main>
     </div>
   )
 }
