@@ -76,7 +76,7 @@ jobs:
         working-directory: apps/desktop
         run: npx vite build && npx electron-builder --publish never ${{ matrix.platform == 'mac' && '--mac' || matrix.platform == 'win' && '--win' || '--linux' }}
         env:
-          VITE_WEB_APP_URL: ${{ vars.WEB_APP_URL || 'https://memories.app' }}
+          VITE_WEB_APP_URL: ${{ vars.WEB_APP_URL || 'https://memories-web-beta.vercel.app' }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
