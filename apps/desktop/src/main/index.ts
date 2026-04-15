@@ -26,13 +26,19 @@ interface StoreSchema {
   triggerWord: string | null
   selectedTeamId: string | null
 }
+const BUILT_WEB_URL = process.env.VITE_WEB_APP_URL ?? "http://localhost:3000"
 const store = new Store<StoreSchema>({
   defaults: {
     token: null, userId: null,
-    webAppUrl: process.env.VITE_WEB_APP_URL ?? "http://localhost:3000",
+    webAppUrl: BUILT_WEB_URL,
     defaultProjectId: null, openaiApiKey: null, triggerWord: null, selectedTeamId: null,
   },
 })
+// Força a URL gravada a acompanhar a do build — o defaults do electron-store
+// só aplica na criação da chave, então usuários com localhost salvo nunca migrariam.
+if (BUILT_WEB_URL !== "http://localhost:3000") {
+  store.set("webAppUrl", BUILT_WEB_URL)
+}
 let recorderWindow: BrowserWindow | null = null
 let loginWindow: BrowserWindow | null = null
 let realtimeWs: WebSocket | null = null
