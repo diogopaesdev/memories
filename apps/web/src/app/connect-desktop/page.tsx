@@ -1,22 +1,47 @@
-import { redirect } from "next/navigation"
 import { getServerSession, signDesktopToken } from "@/lib/session"
 import { db } from "@/lib/firebase-admin"
 import { CopyCodeButton } from "./copy-code-button"
 import { CodeConsumedWatcher } from "./code-consumed-watcher"
+import { GoogleLoginButton } from "@/components/auth/google-login-button"
 
 function generateCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // sem caracteres ambíguos
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
 }
 
 export default async function ConnectDesktopPage() {
   const session = await getServerSession()
-  if (!session?.user) redirect("/login?callbackUrl=/connect-desktop")
 
-  // Gerar código e JWT
+  // ── Não logado: mostrar step de login ──────────────────────────────────
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white p-8">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center mx-auto mb-5">
+              <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+                <circle cx="20" cy="20" r="3.5" fill="#f5f4f0" />
+                <circle cx="20" cy="20" r="8.5" stroke="#f5f4f0" strokeWidth="1.5" opacity="0.55" />
+                <circle cx="20" cy="20" r="14" stroke="#f5f4f0" strokeWidth="1" opacity="0.22" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold mb-1">Conectar Desktop App</h1>
+            <p className="text-sm text-gray-500">Faça login para gerar seu código de ativação.</p>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+            <p className="text-xs text-gray-600 uppercase tracking-widest text-center">Passo 1 de 2</p>
+            <GoogleLoginButton callbackUrl="/connect-desktop" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Logado: gerar e exibir código ──────────────────────────────────────
   const code = generateCode()
   const token = await signDesktopToken(session.user)
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
   await db.collection("desktopCodes").doc(code).set({
     token,
@@ -28,12 +53,12 @@ export default async function ConnectDesktopPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white p-8">
       <div className="w-full max-w-sm space-y-8">
-        {/* Header */}
         <div className="text-center">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-5">
-            <svg className="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center mx-auto mb-5">
+            <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+              <circle cx="20" cy="20" r="3.5" fill="#f5f4f0" />
+              <circle cx="20" cy="20" r="8.5" stroke="#f5f4f0" strokeWidth="1.5" opacity="0.55" />
+              <circle cx="20" cy="20" r="14" stroke="#f5f4f0" strokeWidth="1" opacity="0.22" />
             </svg>
           </div>
           <h1 className="text-xl font-bold mb-1">Conectar Desktop App</h1>
@@ -42,9 +67,8 @@ export default async function ConnectDesktopPage() {
           </p>
         </div>
 
-        {/* Código */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center space-y-4">
-          <p className="text-xs text-gray-600 uppercase tracking-widest">Seu código</p>
+          <p className="text-xs text-gray-600 uppercase tracking-widest">Passo 2 de 2 · Seu código</p>
           <div className="font-mono text-4xl font-bold tracking-[0.3em] text-white">
             {code}
           </div>
@@ -53,7 +77,7 @@ export default async function ConnectDesktopPage() {
         </div>
 
         <p className="text-center text-xs text-gray-700">
-          Cole este código no app desktop e clique em "Conectar".
+          Cole este código no app desktop e clique em &quot;Conectar&quot;.
         </p>
       </div>
       <CodeConsumedWatcher code={code} />

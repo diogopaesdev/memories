@@ -1,45 +1,63 @@
-import { useState, useEffect } from "react"
-import { Loader2 } from "lucide-react"
-import { checkSession } from "@/lib/api"
+import { useState, useEffect, useRef } from "react"
+import { Loader2, ExternalLink, ArrowRight } from "lucide-react"
+import { checkSession, exchangeCode } from "@/lib/api"
 import { electronAPI } from "@/lib/electron"
 
+type Step = "checking" | "idle" | "browser-opened" | "connecting" | "error"
+
 export function LoginWindow() {
-  const [loading, setLoading]   = useState(false)
-  const [checking, setChecking] = useState(true)
-  const [webAppUrl, setWebAppUrl] = useState("http://localhost:3000")
+  const [step, setStep]         = useState<Step>("checking")
+  const [code, setCode]         = useState("")
+  const [errorMsg, setErrorMsg] = useState("")
+  const [webAppUrl, setWebAppUrl] = useState("")
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     async function init() {
       const url = await window.electron.store.get("webAppUrl")
-      if (url) setWebAppUrl(url)
+      setWebAppUrl(url ?? "")
       const session = await checkSession()
       if (session?.user) {
-        await window.electron.store.set("token", "session")
-        await window.electron.store.set("userId", session.user.id)
+        // Já autenticado via token salvo — fechar direto
         electronAPI().window.closeLogin()
+        return
       }
-      setChecking(false)
+      setStep("idle")
     }
     init()
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
-  async function handleOpenBrowser() {
-    setLoading(true)
-    await electronAPI().openWeb("/login")
-    const interval = setInterval(async () => {
-      const session = await checkSession()
-      if (session?.user) {
-        clearInterval(interval)
-        await window.electron.store.set("token", "session")
-        await window.electron.store.set("userId", session.user.id)
-        await electronAPI().notify("Login realizado!", `Bem-vindo, ${session.user.name}`)
-        electronAPI().window.closeLogin()
-      }
-    }, 2000)
-    setTimeout(() => { clearInterval(interval); setLoading(false) }, 300_000)
+  function openBrowser() {
+    electronAPI().openWeb("/connect-desktop")
+    setStep("browser-opened")
+    setErrorMsg("")
   }
 
-  if (checking) {
+  async function handleConnect() {
+    const trimmed = code.trim().toUpperCase().replace(/\s/g, "")
+    if (trimmed.length < 6) {
+      setErrorMsg("Digite o código de 6 caracteres exibido no site.")
+      return
+    }
+    setStep("connecting")
+    setErrorMsg("")
+    try {
+      const { token, userId } = await exchangeCode(trimmed)
+      await window.electron.store.set("token", token)
+      await window.electron.store.set("userId", userId)
+      await electronAPI().notify("Conectado!", "Bem-vindo ao Memories.")
+      electronAPI().window.closeLogin()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao conectar"
+      setErrorMsg(msg)
+      setStep("browser-opened")
+    }
+  }
+
+  /* ── render ── */
+
+  if (step === "checking") {
     return (
       <div style={{
         height: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
@@ -58,39 +76,26 @@ export function LoginWindow() {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
       userSelect: "none",
     }}>
-      {/* Logo mark */}
+      {/* Logo */}
       <div style={{ marginBottom: 24, position: "relative", width: 52, height: 52 }}>
-        {/* Rounded square bg */}
         <div style={{
           position: "absolute", inset: 0, borderRadius: 14,
           background: "#161616", border: "1px solid rgba(255,255,255,0.06)",
         }} />
-        {/* Outer ring */}
         <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          width: 34, height: 34,
-          transform: "translate(-50%,-50%)",
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.2)",
+          position: "absolute", top: "50%", left: "50%",
+          width: 34, height: 34, transform: "translate(-50%,-50%)",
+          borderRadius: "50%", border: "1px solid rgba(255,255,255,0.2)",
         }} />
-        {/* Middle ring */}
         <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          width: 20, height: 20,
-          transform: "translate(-50%,-50%)",
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.35)",
+          position: "absolute", top: "50%", left: "50%",
+          width: 20, height: 20, transform: "translate(-50%,-50%)",
+          borderRadius: "50%", border: "1px solid rgba(255,255,255,0.35)",
         }} />
-        {/* Center dot */}
         <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          width: 7, height: 7,
-          transform: "translate(-50%,-50%)",
-          borderRadius: "50%",
-          background: "rgba(255,255,255,0.7)",
+          position: "absolute", top: "50%", left: "50%",
+          width: 7, height: 7, transform: "translate(-50%,-50%)",
+          borderRadius: "50%", background: "rgba(255,255,255,0.7)",
         }} />
       </div>
 
@@ -101,53 +106,99 @@ export function LoginWindow() {
         Captura por voz
       </p>
 
-      {/* Card */}
       <div style={{
         width: "100%", maxWidth: 240,
         background: "#111", borderRadius: 14,
         border: "1px solid #1e1e1e", padding: 18,
+        display: "flex", flexDirection: "column", gap: 14,
       }}>
-        <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 14 }}>
-          Seu browser será aberto para fazer login com Google. Retorne ao app após entrar.
-        </p>
 
-        <button
-          onClick={handleOpenBrowser}
-          disabled={loading}
-          style={{
-            width: "100%", padding: "9px 12px", borderRadius: 9,
-            border: "1px solid rgba(255,255,255,.08)",
-            background: loading ? "#161616" : "rgba(255,255,255,.05)",
-            color: loading ? "#444" : "#888", fontSize: 12, cursor: loading ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            transition: "background .15s, color .15s",
-          }}
-          onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = "rgba(255,255,255,.09)"; e.currentTarget.style.color = "#d0d0ce" }}}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,.05)"; e.currentTarget.style.color = "#888" }}
-        >
-          {loading
-            ? <Loader2 size={13} className="animate-spin" />
-            : (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            )
-          }
-          {loading ? "Aguardando login..." : "Abrir browser para login"}
-        </button>
+        {/* Passo 1 — abrir browser */}
+        <div>
+          <p style={{ fontSize: 10, color: "#555", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8, textTransform: "uppercase" }}>
+            1. Fazer login
+          </p>
+          <button
+            onClick={openBrowser}
+            style={{
+              width: "100%", padding: "9px 12px", borderRadius: 9,
+              border: "1px solid rgba(255,255,255,.08)",
+              background: step === "browser-opened" ? "#161616" : "rgba(255,255,255,.05)",
+              color: step === "browser-opened" ? "#555" : "#888",
+              fontSize: 12, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "background .15s, color .15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,.09)"; e.currentTarget.style.color = "#d0d0ce" }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = step === "browser-opened" ? "#161616" : "rgba(255,255,255,.05)"
+              e.currentTarget.style.color = step === "browser-opened" ? "#555" : "#888"
+            }}
+          >
+            <ExternalLink size={12} />
+            {step === "browser-opened" ? "Browser aberto ✓" : "Abrir browser para login"}
+          </button>
+        </div>
 
-        {loading && (
-          <p style={{ fontSize: 10, color: "#2a2a2a", marginTop: 10, textAlign: "center", lineHeight: 1.5 }}>
-            Após fazer login no browser, o app<br />será atualizado automaticamente.
+        {/* Passo 2 — inserir código */}
+        <div style={{ opacity: step === "idle" ? 0.35 : 1, transition: "opacity .2s" }}>
+          <p style={{ fontSize: 10, color: "#555", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8, textTransform: "uppercase" }}>
+            2. Inserir código de ativação
+          </p>
+          <input
+            disabled={step === "idle" || step === "connecting"}
+            placeholder="Ex: AB3X7Z"
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+            onKeyDown={e => { if (e.key === "Enter") handleConnect() }}
+            style={{
+              width: "100%", padding: "9px 10px", borderRadius: 7,
+              border: "1px solid #242424", background: "#0f0f0f",
+              color: "#f0f0ee", fontSize: 16, fontWeight: 700,
+              fontFamily: "monospace", letterSpacing: "0.25em",
+              outline: "none", boxSizing: "border-box",
+              textAlign: "center", textTransform: "uppercase",
+              transition: "border-color .15s",
+            }}
+            onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
+            onBlur={e => (e.target.style.borderColor = "#242424")}
+          />
+
+          <button
+            onClick={handleConnect}
+            disabled={step === "idle" || step === "connecting" || code.length < 6}
+            style={{
+              width: "100%", marginTop: 8, padding: "9px 12px", borderRadius: 9,
+              border: "1px solid rgba(255,255,255,.12)",
+              background: (step === "idle" || code.length < 6) ? "#161616" : "rgba(255,255,255,.06)",
+              color: (step === "idle" || code.length < 6) ? "#333" : "#f0f0ee",
+              fontSize: 12, fontWeight: 600, cursor: (step === "idle" || code.length < 6) ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "background .15s, color .15s",
+            }}
+            onMouseEnter={e => { if (step !== "idle" && code.length >= 6) e.currentTarget.style.background = "rgba(255,255,255,.1)" }}
+            onMouseLeave={e => { e.currentTarget.style.background = (step === "idle" || code.length < 6) ? "#161616" : "rgba(255,255,255,.06)" }}
+          >
+            {step === "connecting"
+              ? <Loader2 size={13} className="animate-spin" />
+              : <ArrowRight size={13} />
+            }
+            {step === "connecting" ? "Conectando..." : "Conectar"}
+          </button>
+        </div>
+
+        {errorMsg && (
+          <p style={{ fontSize: 11, color: "#c0392b", lineHeight: 1.5, textAlign: "center" }}>
+            {errorMsg}
           </p>
         )}
       </div>
 
-      <p style={{ fontSize: 10, color: "#222", marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
-        Painel em <span style={{ fontFamily: "monospace" }}>{webAppUrl}</span>
-      </p>
+      {webAppUrl && (
+        <p style={{ fontSize: 10, color: "#1e1e1e", marginTop: 20, textAlign: "center", fontFamily: "monospace" }}>
+          {webAppUrl}
+        </p>
+      )}
     </div>
   )
 }

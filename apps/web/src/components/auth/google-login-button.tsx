@@ -3,12 +3,12 @@
 import { useState } from "react"
 import { signIn } from "@/lib/auth-client"
 
-export function GoogleLoginButton() {
+export function GoogleLoginButton({ callbackUrl = "/memories" }: { callbackUrl?: string } = {}) {
   const [loading, setLoading] = useState(false)
 
   async function handle() {
     setLoading(true)
-    await signIn("google", { callbackUrl: "/memories" })
+    await signIn("google", { callbackUrl })
   }
 
   return (
