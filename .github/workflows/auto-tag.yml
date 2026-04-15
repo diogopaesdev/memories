@@ -74,7 +74,7 @@ jobs:
 
       - name: Build desktop app
         working-directory: apps/desktop
-        run: npx vite build && npx electron-builder --publish never
+        run: npx vite build && npx electron-builder --publish never ${{ matrix.platform == 'mac' && '--mac --arch universal' || '' }}
         env:
           VITE_WEB_APP_URL: ${{ vars.WEB_APP_URL || 'https://memories.app' }}
 
