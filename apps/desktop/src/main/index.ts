@@ -14,16 +14,9 @@ import { exec, spawn } from "child_process"
 import fs from "fs"
 import Store from "electron-store"
 import WebSocket from "ws"
-const LOG_FILE = "/tmp/memories-orb-debug.log"
-const dbgLog = (msg: string) => {
-  const line = `${new Date().toISOString()} ${msg}\n`
-  try { process.stdout.write(line) } catch {}
-  try { fs.appendFileSync(LOG_FILE, line) } catch {}
-}
-dbgLog("[orb] process started, acquiring lock...")
+
 const gotLock = app.requestSingleInstanceLock()
-dbgLog(`[orb] gotLock=${gotLock}`)
-if (!gotLock) { dbgLog("[orb] another instance running, quitting"); app.quit(); process.exit(0) }
+if (!gotLock) { app.quit(); process.exit(0) }
 interface StoreSchema {
   token: string | null
   userId: string | null
@@ -68,7 +61,6 @@ function createRecorderWindow() {
       backgroundThrottling: false,
     },
   })
-  dbgLog(`[orb] RENDERER_URL="${RENDERER_URL}" → loading ${RENDERER_URL ? "URL" : "file"}`)
   if (RENDERER_URL) {
     recorderWindow.loadURL(RENDERER_URL)
   } else {
@@ -82,16 +74,8 @@ function createRecorderWindow() {
       recorderWindow?.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     }
     recorderWindow?.show()
-    dbgLog("[orb] ready-to-show → show()")
   })
-  recorderWindow.on("show",   () => dbgLog("[orb] show event"))
-  recorderWindow.on("hide",   () => dbgLog("[orb] hide event — window was hidden"))
-  recorderWindow.on("closed", () => { dbgLog("[orb] closed event"); recorderWindow = null })
-  recorderWindow.webContents.on("render-process-gone", (_, d) => dbgLog(`[orb] renderer crash: ${JSON.stringify(d)}`))
-  recorderWindow.webContents.on("did-fail-load", (_, code, desc) => dbgLog(`[orb] load fail: ${code} ${desc}`))
-  recorderWindow.webContents.on("console-message", (_e, _level, msg) => {
-    if (msg && !msg.includes("Electron Security Warning")) dbgLog(`[renderer] ${msg}`)
-  })
+  recorderWindow.on("closed", () => { recorderWindow = null })
 }
 const MARGIN = 20
 function positionBottomRight(w?: number, h?: number) {
@@ -427,7 +411,6 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
   if (script) await runPS(script)
 })
 app.whenReady().then(() => {
-  dbgLog("[orb] app ready")
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
   session.defaultSession.webRequest.onBeforeSendHeaders(
