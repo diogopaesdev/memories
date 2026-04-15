@@ -464,8 +464,6 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
 })
 
 app.whenReady().then(() => {
-  // macOS: hide dock icon so the app runs as a floating utility (no taskbar presence)
-  if (isMac) app.dock?.hide()
 
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
@@ -490,7 +488,10 @@ app.whenReady().then(() => {
     else { positionBottomRight(); recorderWindow?.show() }
   })
 
-  app.on("activate", () => { if (!recorderWindow) createRecorderWindow() })
+  app.on("activate", () => {
+    if (!recorderWindow) createRecorderWindow()
+    else { positionBottomRight(); recorderWindow.show() }
+  })
 })
 
 app.on("window-all-closed", () => { /* keep alive in tray */ })
