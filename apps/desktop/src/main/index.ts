@@ -14,10 +14,16 @@ import { exec, spawn } from "child_process"
 import fs from "fs"
 import Store from "electron-store"
 import WebSocket from "ws"
-
+const LOG_FILE = "/tmp/memories-orb-debug.log"
+const dbgLog = (msg: string) => {
+  const line = `${new Date().toISOString()} ${msg}\n`
+  try { process.stdout.write(line) } catch {}
+  try { fs.appendFileSync(LOG_FILE, line) } catch {}
+}
+dbgLog("[orb] process started, acquiring lock...")
 const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) { app.quit(); process.exit(0) }
-
+dbgLog(`[orb] gotLock=${gotLock}`)
+if (!gotLock) { dbgLog("[orb] another instance running, quitting"); app.quit(); process.exit(0) }
 interface StoreSchema {
   token: string | null
   userId: string | null
@@ -27,7 +33,6 @@ interface StoreSchema {
   triggerWord: string | null
   selectedTeamId: string | null
 }
-
 const store = new Store<StoreSchema>({
   defaults: {
     token: null, userId: null,
@@ -35,19 +40,15 @@ const store = new Store<StoreSchema>({
     defaultProjectId: null, openaiApiKey: null, triggerWord: null, selectedTeamId: null,
   },
 })
-
 let recorderWindow: BrowserWindow | null = null
 let loginWindow: BrowserWindow | null = null
 let realtimeWs: WebSocket | null = null
-
 const RENDERER_URL = process.env.VITE_DEV_SERVER_URL
 const ORB_W = 180
 const ORB_H = 50
 const PANEL_W = 300
 const PANEL_H = 420
-
 const isMac = process.platform === "darwin"
-
 function createRecorderWindow() {
   recorderWindow = new BrowserWindow({
     width: ORB_W, height: ORB_H,
@@ -56,9 +57,7 @@ function createRecorderWindow() {
     alwaysOnTop: true,
     skipTaskbar: !isMac,   // Windows/Linux only — macOS uses app.dock.hide() instead
     frame: false,
-    // macOS: transparent is required for frameless windows to render content
-    transparent: isMac,
-    backgroundColor: isMac ? "#00000000" : "#0f0f0f",
+    backgroundColor: "#0f0f0f",
     hasShadow: true,
     roundedCorners: true,
     show: false,
@@ -69,29 +68,32 @@ function createRecorderWindow() {
       backgroundThrottling: false,
     },
   })
-
+  dbgLog(`[orb] RENDERER_URL="${RENDERER_URL}" → loading ${RENDERER_URL ? "URL" : "file"}`)
   if (RENDERER_URL) {
     recorderWindow.loadURL(RENDERER_URL)
   } else {
     recorderWindow.loadFile(path.join(__dirname, "../../dist/index.html"), { hash: "/recorder" })
   }
-
   recorderWindow.on("ready-to-show", () => {
     if (!isMac) recorderWindow?.setSkipTaskbar(true)
-    // Position before show so the window appears at the right spot immediately
     positionBottomRight()
     if (isMac) {
-      // Make window follow the user across Spaces and appear above full-screen apps
+      recorderWindow?.setAlwaysOnTop(true, "floating")
       recorderWindow?.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-      recorderWindow?.setAlwaysOnTop(true, "pop-up-menu")
     }
     recorderWindow?.show()
+    dbgLog("[orb] ready-to-show → show()")
   })
-  recorderWindow.on("closed", () => { recorderWindow = null })
+  recorderWindow.on("show",   () => dbgLog("[orb] show event"))
+  recorderWindow.on("hide",   () => dbgLog("[orb] hide event — window was hidden"))
+  recorderWindow.on("closed", () => { dbgLog("[orb] closed event"); recorderWindow = null })
+  recorderWindow.webContents.on("render-process-gone", (_, d) => dbgLog(`[orb] renderer crash: ${JSON.stringify(d)}`))
+  recorderWindow.webContents.on("did-fail-load", (_, code, desc) => dbgLog(`[orb] load fail: ${code} ${desc}`))
+  recorderWindow.webContents.on("console-message", (_e, _level, msg) => {
+    if (msg && !msg.includes("Electron Security Warning")) dbgLog(`[renderer] ${msg}`)
+  })
 }
-
 const MARGIN = 20
-
 function positionBottomRight(w?: number, h?: number) {
   if (!recorderWindow) return
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
@@ -100,17 +102,14 @@ function positionBottomRight(w?: number, h?: number) {
   const wh = h ?? bounds.height
   recorderWindow.setBounds({ x: sw - ww - MARGIN, y: sh - wh - MARGIN, width: ww, height: wh }, false)
 }
-
 function openLogin() {
   shell.openExternal(`${store.get("webAppUrl")}/connect-desktop`)
 }
-
 function handleSignOut() {
   store.set("token", null)
   store.set("userId", null)
   store.set("defaultProjectId", null)
 }
-
 function showOrbContextMenu() {
   const isLoggedIn = Boolean(store.get("token"))
   const menu = Menu.buildFromTemplate([
@@ -121,24 +120,22 @@ function showOrbContextMenu() {
   ])
   menu.popup({ window: recorderWindow ?? undefined })
 }
-
 // ── IPC ──
 ipcMain.handle("store:get", (_e, key: keyof StoreSchema) => store.get(key))
 ipcMain.handle("store:set", (_e, key: keyof StoreSchema, value: string | null) => { store.set(key, value as never) })
-
 ipcMain.handle("window:close-login", () => { (loginWindow as BrowserWindow | null)?.close() })
 ipcMain.handle("window:set-size", (_e, w: number, h: number) => {
   if (!recorderWindow) return
   positionBottomRight(w, h)
   if (!isMac) recorderWindow.setSkipTaskbar(true)
-  // macOS: "screen-saver" level blocks mouse events — use "pop-up-menu" instead
-  recorderWindow.setAlwaysOnTop(true, isMac ? "pop-up-menu" : "screen-saver")
+  // macOS: "floating" keeps the orb persistent; "screen-saver" blocks mouse events on macOS
+  recorderWindow.setAlwaysOnTop(true, isMac ? "floating" : "screen-saver")
+  if (isMac) recorderWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   if (!recorderWindow.isVisible()) recorderWindow.show()
   recorderWindow.moveTop()
 })
 ipcMain.handle("window:open-login", () => openLogin())
 ipcMain.handle("window:context-menu", () => showOrbContextMenu())
-
 ipcMain.handle("ai:process-voice", async (_e, transcript: string, openaiApiKey: string | null) => {
   const token = store.get("token")
   const webAppUrl = store.get("webAppUrl")
@@ -152,7 +149,6 @@ ipcMain.handle("ai:process-voice", async (_e, transcript: string, openaiApiKey: 
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
   return data
 })
-
 ipcMain.handle("ai:chat", async (_e, transcript: string, history: unknown[], openaiApiKey: string | null) => {
   const token = store.get("token")
   const webAppUrl = store.get("webAppUrl")
@@ -160,14 +156,12 @@ ipcMain.handle("ai:chat", async (_e, transcript: string, history: unknown[], ope
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().size
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 25000)
-
   // Pass saved recording names so the AI can use exact names for replay
   const savedRecordings = Object.entries(loadRecordings()).map(([name, evs]) => ({
     name,
     eventCount: evs.length,
     durationMs: evs.length > 1 ? evs[evs.length - 1].t - evs[0].t : 0,
   }))
-
   try {
     const res = await fetch(`${webAppUrl}/api/ai/chat`, {
       method: "POST",
@@ -182,7 +176,6 @@ ipcMain.handle("ai:chat", async (_e, transcript: string, history: unknown[], ope
     clearTimeout(timeout)
   }
 })
-
 ipcMain.handle("audio:transcribe", async (_e, audioBuffer: ArrayBuffer, apiKey: string) => {
   const buffer = Buffer.from(audioBuffer)
   const file = new File([buffer], "recording.webm", { type: "audio/webm" })
@@ -195,7 +188,6 @@ ipcMain.handle("audio:transcribe", async (_e, audioBuffer: ArrayBuffer, apiKey: 
   if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
   return data.text as string
 })
-
 ipcMain.handle("auth:exchange-code", async (_e, code: string) => {
   const webAppUrl = store.get("webAppUrl")
   const res = await fetch(`${webAppUrl}/api/auth/exchange-code`, {
@@ -205,7 +197,6 @@ ipcMain.handle("auth:exchange-code", async (_e, code: string) => {
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
   return data
 })
-
 ipcMain.handle("auth:check-session", async () => {
   const token = store.get("token")
   if (!token) return null
@@ -216,9 +207,7 @@ ipcMain.handle("auth:check-session", async () => {
     return res.json()
   } catch { return null }
 })
-
 ipcMain.handle("notify", (_e, title: string, body: string) => new Notification({ title, body }).show())
-
 ipcMain.handle("teams:list", async () => {
   const token = store.get("token")
   if (!token) return []
@@ -229,7 +218,6 @@ ipcMain.handle("teams:list", async () => {
     return res.json()
   } catch { return [] }
 })
-
 ipcMain.handle("realtime:start", (event, apiKey: string) => {
   if (realtimeWs) { realtimeWs.close(); realtimeWs = null }
   return new Promise<{ ok: boolean }>((resolve, reject) => {
@@ -258,13 +246,11 @@ ipcMain.handle("realtime:start", (event, apiKey: string) => {
     })
   })
 })
-
 ipcMain.on("realtime:audio", (_e, audio: string) => {
   if (realtimeWs?.readyState === WebSocket.OPEN) {
     realtimeWs.send(JSON.stringify({ type: "input_audio_buffer.append", audio }))
   }
 })
-
 ipcMain.handle("tts:speak", async (_e, text: string, apiKey: string) => {
   const res = await fetch("https://api.openai.com/v1/audio/speech", {
     method: "POST",
@@ -277,19 +263,16 @@ ipcMain.handle("tts:speak", async (_e, text: string, apiKey: string) => {
   // Return base64 string — safer than Buffer through contextBridge serialization
   return Buffer.from(await res.arrayBuffer()).toString("base64")
 })
-
 ipcMain.handle("realtime:stop", () => { realtimeWs?.close(1000); realtimeWs = null })
 // Internal paths: prepend webAppUrl. Absolute URLs: open directly.
 ipcMain.handle("open-web", (_e, p: string) => {
   const url = p.startsWith("http") ? p : store.get("webAppUrl") + p
   return shell.openExternal(url)
 })
-
 ipcMain.handle("system:username", () => {
   const os = require("os") as typeof import("os")
   return os.userInfo().username
 })
-
 ipcMain.handle("system:open-app", (_e, appName: string) => {
   return new Promise<void>((resolve) => {
     // Windows: `start ""` hands off to shell — works for installed apps by name
@@ -303,7 +286,6 @@ ipcMain.handle("system:open-app", (_e, appName: string) => {
     })
   })
 })
-
 // ── PowerShell helper ──
 function runPS(script: string): Promise<void> {
   return new Promise((resolve) => {
@@ -315,7 +297,6 @@ function runPS(script: string): Promise<void> {
     child.stdin?.end()
   })
 }
-
 const PS_MOUSE_TYPE = `
 Add-Type -TypeDefinition @"
 using System.Runtime.InteropServices;
@@ -326,23 +307,17 @@ public class WinMouse {
 }
 "@ -ErrorAction SilentlyContinue
 `
-
 // ── Mouse recording & replay ──────────────────────────────────────────────
-
 interface RecEvent { t: number; type: string; x: number; y: number }
-
 let recordingChild: ReturnType<typeof spawn> | null = null
 let recordingBuffer: RecEvent[] = []
-
 const recordingsFile = () => path.join(app.getPath("userData"), "macro-recordings.json")
-
 function loadRecordings(): Record<string, RecEvent[]> {
   try { return JSON.parse(fs.readFileSync(recordingsFile(), "utf-8")) } catch { return {} }
 }
 function saveRecordings(recs: Record<string, RecEvent[]>) {
   fs.writeFileSync(recordingsFile(), JSON.stringify(recs), "utf-8")
 }
-
 // PowerShell script that polls mouse position + button state at 20ms intervals
 const PS_RECORD_SCRIPT = `
 Add-Type -AssemblyName System.Windows.Forms
@@ -365,14 +340,11 @@ while($true){
   $ls=$ln;$rs=$rn
   Start-Sleep -Milliseconds 20
 }`
-
 ipcMain.handle("mouse:start-recording", () => {
   if (recordingChild) { recordingChild.kill(); recordingChild = null }
   recordingBuffer = []
-
   const scriptPath = path.join(app.getPath("temp"), "memories-recorder.ps1")
   fs.writeFileSync(scriptPath, PS_RECORD_SCRIPT, "utf-8")
-
   recordingChild = spawn("powershell", ["-NoProfile", "-File", scriptPath], { stdio: ["ignore", "pipe", "ignore"] })
   recordingChild.stdout?.on("data", (chunk: Buffer) => {
     for (const line of chunk.toString().split(/\r?\n/).filter(Boolean)) {
@@ -382,7 +354,6 @@ ipcMain.handle("mouse:start-recording", () => {
   })
   return { ok: true }
 })
-
 ipcMain.handle("mouse:stop-recording", (_e, name: string) => {
   recordingChild?.kill(); recordingChild = null
   const events = [...recordingBuffer]; recordingBuffer = []
@@ -392,7 +363,6 @@ ipcMain.handle("mouse:stop-recording", (_e, name: string) => {
   const durationMs = events.length > 1 ? events[events.length - 1].t - events[0].t : 0
   return { eventCount: events.length, durationMs, name }
 })
-
 ipcMain.handle("mouse:replay", (_e, name: string) => {
   const recs = loadRecordings()
   // Try exact name first; fall back to most recently saved recording
@@ -406,7 +376,6 @@ ipcMain.handle("mouse:replay", (_e, name: string) => {
     console.log(`Replay: nome "${name}" não encontrado, usando "${resolvedName}"`)
   }
   if (!events?.length) throw new Error(`Gravação "${resolvedName}" está vazia`)
-
   // Build a single PS script with all events + timing pre-computed
   const psLines = [
     `Add-Type -TypeDefinition @"`,
@@ -419,7 +388,6 @@ ipcMain.handle("mouse:replay", (_e, name: string) => {
     `"@ -ErrorAction SilentlyContinue`,
     `Start-Sleep -Milliseconds 1500`, // give user time to switch window
   ]
-
   let lastT = events[0].t
   for (const ev of events) {
     const delay = ev.t - lastT
@@ -433,13 +401,11 @@ ipcMain.handle("mouse:replay", (_e, name: string) => {
       case "ru": psLines.push(`[WR]::mouse_event([WR]::RU,0,0,0,0)`); break
     }
   }
-
   const scriptPath = path.join(app.getPath("temp"), "memories-replay.ps1")
   fs.writeFileSync(scriptPath, psLines.join("\n"), "utf-8")
   exec(`powershell -NoProfile -File "${scriptPath}"`)
   return { ok: true }
 })
-
 ipcMain.handle("mouse:list-recordings", () => {
   const recs = loadRecordings()
   return Object.entries(recs).map(([name, evs]) => ({
@@ -447,9 +413,7 @@ ipcMain.handle("mouse:list-recordings", () => {
     durationMs: evs.length > 1 ? evs[evs.length - 1].t - evs[0].t : 0,
   }))
 })
-
 // ─────────────────────────────────────────────────────────────────────────────
-
 ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, extra?: number) => {
   const move = `[WinMouse]::SetCursorPos(${Math.round(x)}, ${Math.round(y)})`
   const scripts: Record<string, string> = {
@@ -462,9 +426,8 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
   const script = scripts[action]
   if (script) await runPS(script)
 })
-
 app.whenReady().then(() => {
-
+  dbgLog("[orb] app ready")
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
   session.defaultSession.webRequest.onBeforeSendHeaders(
@@ -478,21 +441,20 @@ app.whenReady().then(() => {
       callback({ requestHeaders: details.requestHeaders })
     }
   )
-
   Menu.setApplicationMenu(null)
   createRecorderWindow()
-  // positionBottomRight is now called inside ready-to-show for correct timing
-
+  // Hide dock icon AFTER window is created so macOS uses NSApplicationActivationPolicyAccessory.
+  // This keeps the orb visible even when another app is in focus — Accessory-policy windows
+  // are not subject to the normal "hide on deactivate" behaviour that affects panels/regular windows.
+  if (isMac) app.dock.hide()
   globalShortcut.register("CommandOrControl+Shift+R", () => {
     if (recorderWindow?.isVisible()) recorderWindow.hide()
     else { positionBottomRight(); recorderWindow?.show() }
   })
-
   app.on("activate", () => {
     if (!recorderWindow) createRecorderWindow()
     else { positionBottomRight(); recorderWindow.show() }
   })
 })
-
 app.on("window-all-closed", () => { /* keep alive in tray */ })
 app.on("will-quit", () => globalShortcut.unregisterAll())
