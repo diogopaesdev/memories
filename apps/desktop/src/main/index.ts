@@ -53,7 +53,8 @@ function createRecorderWindow() {
     width: ORB_W, height: ORB_H,
     title: "",
     resizable: false,
-    alwaysOnTop: true, skipTaskbar: true,
+    alwaysOnTop: true,
+    skipTaskbar: !isMac,   // Windows/Linux only — macOS uses app.dock.hide() instead
     frame: false,
     // macOS: transparent is required for frameless windows to render content
     transparent: isMac,
@@ -76,7 +77,14 @@ function createRecorderWindow() {
   }
 
   recorderWindow.on("ready-to-show", () => {
-    recorderWindow?.setSkipTaskbar(true)
+    if (!isMac) recorderWindow?.setSkipTaskbar(true)
+    // Position before show so the window appears at the right spot immediately
+    positionBottomRight()
+    if (isMac) {
+      // Make window follow the user across Spaces and appear above full-screen apps
+      recorderWindow?.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+      recorderWindow?.setAlwaysOnTop(true, "pop-up-menu")
+    }
     recorderWindow?.show()
   })
   recorderWindow.on("closed", () => { recorderWindow = null })
@@ -456,6 +464,9 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
 })
 
 app.whenReady().then(() => {
+  // macOS: hide dock icon so the app runs as a floating utility (no taskbar presence)
+  if (isMac) app.dock?.hide()
+
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
   session.defaultSession.webRequest.onBeforeSendHeaders(
@@ -472,7 +483,7 @@ app.whenReady().then(() => {
 
   Menu.setApplicationMenu(null)
   createRecorderWindow()
-  positionBottomRight()
+  // positionBottomRight is now called inside ready-to-show for correct timing
 
   globalShortcut.register("CommandOrControl+Shift+R", () => {
     if (recorderWindow?.isVisible()) recorderWindow.hide()
