@@ -1,4 +1,4 @@
-import { defineConfig } from "vite"
+import { defineConfig, loadEnv } from "vite"
 import react from "@vitejs/plugin-react"
 import electron from "vite-plugin-electron"
 import renderer from "vite-plugin-electron-renderer"
@@ -40,7 +40,13 @@ function startElectron() {
   }, 600)
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Carrega .env / .env.production dependendo do mode
+  const env = loadEnv(mode, __dirname, "")
+  // process.env tem precedência (GitHub Actions injeta VITE_WEB_APP_URL no step)
+  const webAppUrl = process.env.VITE_WEB_APP_URL ?? env.VITE_WEB_APP_URL ?? "http://localhost:3000"
+
+return {
   plugins: [
     react(),
     electron([
@@ -48,6 +54,10 @@ export default defineConfig({
         entry: path.resolve(__dirname, "src/main/index.ts"),
         onstart: startElectron,
         vite: {
+          define: {
+            // Substitui em build time — process.env não existe no instalador do usuário
+            "process.env.VITE_WEB_APP_URL": JSON.stringify(webAppUrl),
+          },
           build: {
             outDir: path.resolve(__dirname, "dist-electron/main"),
             rollupOptions: {
@@ -95,4 +105,5 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
   },
+}
 })
