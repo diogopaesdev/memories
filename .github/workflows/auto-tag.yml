@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "apps/desktop/package.json"
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -14,8 +16,8 @@ jobs:
   tag:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      is_new: ${{ steps.check.outputs.exists == 'false' }}
+      tag: ${{ github.ref_type == 'tag' && github.ref_name || steps.version.outputs.tag }}
+      is_new: ${{ github.ref_type == 'tag' || steps.check.outputs.exists == 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +40,7 @@ jobs:
           fi
 
       - name: Create tag
-        if: steps.check.outputs.exists == 'false'
+        if: github.ref_type != 'tag' && steps.check.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,6 +65,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
