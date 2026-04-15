@@ -6,6 +6,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
+    "rootDir": "src",
     "outDir": "dist-electron",
     "paths": {
       "@/*": ["./src/renderer/src/*"],
