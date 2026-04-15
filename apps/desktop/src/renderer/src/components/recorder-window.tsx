@@ -203,6 +203,7 @@ export function RecorderWindow() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [codeInput, setCodeInput]           = useState("")
   const [activeStep, setActiveStep]         = useState<"account" | "apikey" | null>(null)
+  const [wantsTrigger, setWantsTrigger]     = useState(false)
   const messagesRef = useRef<AppMessage[]>([])
   const chatEndRef  = useRef<HTMLDivElement>(null)
   const panelOpenRef = useRef(false)
@@ -401,7 +402,9 @@ export function RecorderWindow() {
   async function saveTriggerWord() {
     const word = triggerInput.trim() || null
     await window.electron.store.set("triggerWord", word)
-    setTriggerWord(word); setTriggerInput("")
+    setTriggerWord(word)
+    setTriggerInput("")
+    setWantsTrigger(false)
     if (isAuthed && savedKey) startListening()
   }
 
@@ -774,46 +777,54 @@ export function RecorderWindow() {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <button
                       onClick={async () => {
-                        if (triggerWord) {
-                          // Switch to always-on: clear trigger word
+                        const inTriggerMode = !!triggerWord || wantsTrigger
+                        if (inTriggerMode) {
                           await window.electron.store.set("triggerWord", null)
                           setTriggerWord(null)
-                        } else {
-                          // Switch to trigger mode: prompt user to set one
+                          setWantsTrigger(false)
                           setTriggerInput("")
+                          if (isAuthed && savedKey) startListening()
+                        } else {
+                          setWantsTrigger(true)
                         }
-                        if (isAuthed && savedKey) startListening()
                       }}
                       style={{
                         position: "relative", width: 32, height: 18, borderRadius: 9,
-                        background: !triggerWord ? "rgba(255,255,255,0.25)" : "#1a1a1a",
+                        background: (!triggerWord && !wantsTrigger) ? "rgba(255,255,255,0.25)" : "#1a1a1a",
                         border: "1px solid #333", cursor: "pointer", flexShrink: 0,
                         transition: "background .2s",
                       }}
                     >
                       <div style={{
                         position: "absolute", top: 2,
-                        left: !triggerWord ? 15 : 2,
+                        left: (!triggerWord && !wantsTrigger) ? 15 : 2,
                         width: 12, height: 12, borderRadius: "50%",
-                        background: !triggerWord ? "rgba(255,255,255,0.9)" : "#444",
+                        background: (!triggerWord && !wantsTrigger) ? "rgba(255,255,255,0.9)" : "#444",
                         transition: "left .2s, background .2s",
                       }} />
                     </button>
-                    <span style={{ fontSize: 11, color: !triggerWord ? "#aaa" : "#444" }}>
-                      {!triggerWord ? "Sempre ativa (sem gatilho)" : "Requer palavra-gatilho"}
+                    <span style={{ fontSize: 11, color: (!triggerWord && !wantsTrigger) ? "#aaa" : "#888" }}>
+                      {(!triggerWord && !wantsTrigger) ? "Sempre ativa" : "Palavra-gatilho"}
                     </span>
                   </div>
 
-                  {/* Trigger word input — only show when trigger mode is active */}
-                  {triggerWord !== null && (
+                  {/* Trigger word input — shown when in trigger mode (with or without word saved) */}
+                  {(triggerWord !== null || wantsTrigger) && (
                     <>
-                      <p style={{ fontSize: 10, color: "#333", lineHeight: 1.6, marginBottom: 6 }}>
-                        Gatilho atual: <span style={{ color: "#555" }}>"{triggerWord}"</span>
-                      </p>
-                      <input style={S.input} placeholder="Alterar palavra-gatilho..." value={triggerInput}
+                      {triggerWord && (
+                        <p style={{ fontSize: 10, color: "#333", marginBottom: 6 }}>
+                          Gatilho atual: <span style={{ color: "#555" }}>"{triggerWord}"</span>
+                        </p>
+                      )}
+                      <input
+                        autoFocus={wantsTrigger && !triggerWord}
+                        style={S.input}
+                        placeholder={triggerWord ? "Alterar palavra-gatilho..." : "Ex: Jarvis, Hey, Memories..."}
+                        value={triggerInput}
                         onChange={e => setTriggerInput(e.target.value)}
                         onFocus={e => (e.target.style.borderColor = "rgba(255,255,255,.2)")}
                         onBlur={e => (e.target.style.borderColor = "#242424")}
+                        onKeyDown={e => e.key === "Enter" && saveTriggerWord()}
                       />
                       <button onClick={saveTriggerWord} style={{ ...S.btnPrimary, marginTop: 6, fontSize: 11 }}
                         onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,.1)")}
