@@ -41,7 +41,12 @@ const store = new Store<StoreSchema>({
     defaultProjectId: null, openaiApiKey: null, triggerWord: null, selectedTeamId: null,
   },
 })
-// Força a URL do store a seguir o build — defaults só aplica na criação da chave.
+// Se a URL mudou de localhost para produção, o token antigo não é válido no novo ambiente.
+const previousUrl = store.get("webAppUrl")
+if (previousUrl !== BUILT_WEB_URL && previousUrl.includes("localhost")) {
+  store.set("token", null)
+  store.set("userId", null)
+}
 store.set("webAppUrl", BUILT_WEB_URL)
 let recorderWindow: BrowserWindow | null = null
 let loginWindow: BrowserWindow | null = null
