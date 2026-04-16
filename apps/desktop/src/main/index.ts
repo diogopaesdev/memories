@@ -8,6 +8,7 @@ import {
   Notification,
   screen,
   session,
+  systemPreferences,
 } from "electron"
 import path from "path"
 import { exec, spawn } from "child_process"
@@ -419,6 +420,13 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
 app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
+  // macOS: solicita permissão de microfone ao sistema operacional.
+  // Sem isso o getUserMedia falha silenciosamente mesmo com entitlements corretos.
+  if (isMac) {
+    systemPreferences.askForMediaAccess("microphone").then((granted) => {
+      if (!granted) console.warn("Microfone: permissão negada pelo usuário")
+    })
+  }
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ["wss://api.openai.com/*", "https://api.openai.com/*"] },
     (details, callback) => {

@@ -46,7 +46,8 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "entitlements.mac.plist"
     ],
     "win": {
       "target": [
@@ -65,7 +66,12 @@
         }
       ],
       "icon": "public/icon.png",
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Memories usa o microfone para captura de voz por comando."
+      }
     },
     "linux": {
       "target": "AppImage",
