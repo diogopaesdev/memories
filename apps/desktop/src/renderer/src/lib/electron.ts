@@ -28,6 +28,9 @@ interface ElectronBridge {
     replay: (name: string) => Promise<{ ok: boolean }>
     list:   ()             => Promise<{ name: string; eventCount: number; durationMs: number }[]>
   }
+  screenshot: {
+    analyze: (apiKey: string, prompt?: string) => Promise<string>
+  }
   realtime: {
     start: (apiKey: string) => Promise<{ ok: boolean }>
     sendAudio: (audio: string) => void

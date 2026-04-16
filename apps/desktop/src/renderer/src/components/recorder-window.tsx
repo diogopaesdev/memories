@@ -306,6 +306,11 @@ export function RecorderWindow() {
         : undefined
       addMessage({ role: "assistant", content: res.reply, action: res.action, memories })
       speak(res.reply).catch(() => {})
+      if (res.screenshotAction && savedKeyRef.current) {
+        const desc = await electronAPI().screenshot.analyze(savedKeyRef.current, res.screenshotPrompt ?? undefined)
+        addMessage({ role: "assistant", content: desc })
+        speak(desc).catch(() => {})
+      }
       if (res.openUrl)     electronAPI().openWeb(res.openUrl).catch(() => {})
       if (res.openAppName) electronAPI().openApp(res.openAppName).catch(() => {})
       if (res.mouseAction) {

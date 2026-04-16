@@ -12,6 +12,8 @@ export interface ChatResponse {
   reply: string
   openUrl?: string
   openAppName?: string
+  screenshotAction?: boolean
+  screenshotPrompt?: string
   mouseAction?: { type: string; x: number; y: number; scrollAmount?: number }
   data?: {
     reportId?: string
@@ -138,6 +140,8 @@ Responda APENAS em JSON:
   "openUrl": "url completa ou path" (use para: abrir memória/projeto do app → "/memories/{id}"; pesquisar na web → "https://www.google.com/search?q=..." ou YouTube/GitHub/etc.; abrir site → URL completa. Só inclua quando o usuário pedir explicitamente.),
   "openAppName": "nome do programa" (inclua quando o usuário pedir para abrir um programa instalado no computador, ex: "spotify", "chrome", "code", "notepad", "whatsapp", "discord". Use o nome do executável ou nome comercial.),
   "mouseAction": { "type": "move"|"click"|"doubleClick"|"rightClick"|"scroll", "x": number, "y": number, "scrollAmount": number } (inclua quando o usuário pedir para mover o mouse, clicar em coordenadas ou fazer scroll. Use as dimensões da tela para calcular posições nomeadas: "centro da tela"=(${Math.round(screenW/2)},${Math.round(screenH/2)}), "canto superior esquerdo"=(0,0), etc. Para scroll: scrollAmount positivo=baixo, negativo=cima.),
+  "screenshotAction": true (inclua APENAS quando o usuário pedir para analisar a tela, tirar print, ver o que está na tela, descrever a janela, etc.),
+  "screenshotPrompt": "instrução específica para análise da imagem" (opcional, use para direcionar o que analisar. Ex: "Que aplicativo está aberto?" ou "Existe algum erro visível?"),
   "recordingAction": "start"|"stop"|"replay" (para automação por gravação de movimentos: se o usuário pede para automatizar/gravar uma tarefa → "start"; se diz "parar", "terminei", "pronto" após gravação → "stop"; se pede para repetir/executar/fazer uma gravação → "replay"),
   "recordingName": "nome da tarefa" (para "start": nome descritivo, ex: "enviar email". Para "replay": use o nome EXATO da lista de gravações disponíveis acima. Para "stop": não é necessário.),
   "create": {
@@ -174,8 +178,10 @@ Responda APENAS em JSON:
       ...(ai.openUrl      ? { openUrl:      ai.openUrl      as string } : {}),
       ...(ai.openAppName  ? { openAppName:  ai.openAppName  as string } : {}),
       ...(ai.mouseAction     ? { mouseAction:     ai.mouseAction                      } : {}),
-      ...(ai.recordingAction ? { recordingAction: ai.recordingAction as string        } : {}),
-      ...(ai.recordingName   ? { recordingName:   ai.recordingName   as string        } : {}),
+      ...(ai.recordingAction  ? { recordingAction:  ai.recordingAction  as string } : {}),
+      ...(ai.recordingName    ? { recordingName:    ai.recordingName    as string } : {}),
+      ...(ai.screenshotAction ? { screenshotAction: true                          } : {}),
+      ...(ai.screenshotPrompt ? { screenshotPrompt: ai.screenshotPrompt as string } : {}),
     }
 
     // Handle create action

@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld("electron", {
     replay: (name: string) => ipcRenderer.invoke("mouse:replay", name),
     list:   ()             => ipcRenderer.invoke("mouse:list-recordings"),
   },
+  screenshot: {
+    analyze: (apiKey: string, prompt?: string) => ipcRenderer.invoke("screenshot:analyze", apiKey, prompt),
+  },
   realtime: {
     start: (apiKey: string) => ipcRenderer.invoke("realtime:start", apiKey),
     sendAudio: (audio: string) => ipcRenderer.send("realtime:audio", audio),

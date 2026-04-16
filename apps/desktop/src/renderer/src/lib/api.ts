@@ -19,6 +19,8 @@ export interface ChatResponse {
   mouseAction?: { type: string; x: number; y: number; scrollAmount?: number }
   recordingAction?: "start" | "stop" | "replay"
   recordingName?: string
+  screenshotAction?: boolean
+  screenshotPrompt?: string
   data?: {
     reportId?: string
     projectId?: string
