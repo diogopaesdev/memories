@@ -261,6 +261,7 @@ export function useContinuousListener(
 
       const ctx = new AudioContext({ sampleRate: 24000 })
       audioCtxRef.current = ctx
+      dbg(`AudioContext: ${ctx.sampleRate}Hz`)
       const source = ctx.createMediaStreamSource(stream)
       // eslint-disable-next-line @typescript-eslint/no-deprecated
       const processor = ctx.createScriptProcessor(4096, 1, 1)
@@ -268,11 +269,26 @@ export function useContinuousListener(
       source.connect(processor)
       processor.connect(ctx.destination)
 
+      const deviceRate = ctx.sampleRate
+      if (deviceRate !== 24000) dbg(`Resample ${deviceRate}Hz → 24000Hz`)
+
       let chunkCount = 0
       processor.onaudioprocess = (ev) => {
         chunkCount++
-        if (chunkCount === 1) dbg("Áudio fluindo...")
-        const audio = pcm16Base64(ev.inputBuffer.getChannelData(0))
+        if (chunkCount === 1) dbg(`Áudio fluindo (${deviceRate}Hz)...`)
+        let samples = ev.inputBuffer.getChannelData(0)
+        // macOS (e outros) podem usar taxa nativa diferente de 24kHz.
+        // O OpenAI Realtime espera exatamente PCM16 a 24000Hz — resamplear se necessário.
+        if (deviceRate !== 24000) {
+          const ratio = deviceRate / 24000
+          const outLen = Math.round(samples.length / ratio)
+          const resampled = new Float32Array(outLen)
+          for (let i = 0; i < outLen; i++) {
+            resampled[i] = samples[Math.floor(i * ratio)]
+          }
+          samples = resampled
+        }
+        const audio = pcm16Base64(samples)
         window.electron.realtime.sendAudio(audio)
       }
     } catch (err) {
