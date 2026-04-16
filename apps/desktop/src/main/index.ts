@@ -9,6 +9,7 @@ import {
   screen,
   session,
   systemPreferences,
+  desktopCapturer,
 } from "electron"
 import path from "path"
 import { exec, spawn } from "child_process"
@@ -27,7 +28,12 @@ interface StoreSchema {
   triggerWord: string | null
   selectedTeamId: string | null
 }
-const BUILT_WEB_URL = process.env.VITE_WEB_APP_URL ?? "http://localhost:3000"
+// app.isPackaged é true apenas no instalador final — 100% confiável, sem depender
+// de Vite define (que não funciona no processo main do vite-plugin-electron).
+const PROD_URL = "https://memories-web-beta.vercel.app"
+const BUILT_WEB_URL = app.isPackaged
+  ? PROD_URL
+  : (process.env.VITE_WEB_APP_URL ?? "http://localhost:3000")
 const store = new Store<StoreSchema>({
   defaults: {
     token: null, userId: null,
@@ -35,11 +41,8 @@ const store = new Store<StoreSchema>({
     defaultProjectId: null, openaiApiKey: null, triggerWord: null, selectedTeamId: null,
   },
 })
-// Força a URL gravada a acompanhar a do build — o defaults do electron-store
-// só aplica na criação da chave, então usuários com localhost salvo nunca migrariam.
-if (BUILT_WEB_URL !== "http://localhost:3000") {
-  store.set("webAppUrl", BUILT_WEB_URL)
-}
+// Força a URL do store a seguir o build — defaults só aplica na criação da chave.
+store.set("webAppUrl", BUILT_WEB_URL)
 let recorderWindow: BrowserWindow | null = null
 let loginWindow: BrowserWindow | null = null
 let realtimeWs: WebSocket | null = null
@@ -332,6 +335,7 @@ while($true){
   Start-Sleep -Milliseconds 20
 }`
 ipcMain.handle("mouse:start-recording", () => {
+  if (isMac) return { ok: false, error: "Gravação de mouse não disponível no macOS" }
   if (recordingChild) { recordingChild.kill(); recordingChild = null }
   recordingBuffer = []
   const scriptPath = path.join(app.getPath("temp"), "memories-recorder.ps1")
@@ -355,6 +359,7 @@ ipcMain.handle("mouse:stop-recording", (_e, name: string) => {
   return { eventCount: events.length, durationMs, name }
 })
 ipcMain.handle("mouse:replay", (_e, name: string) => {
+  if (isMac) throw new Error("Replay de mouse não disponível no macOS")
   const recs = loadRecordings()
   // Try exact name first; fall back to most recently saved recording
   let events = recs[name]
@@ -406,7 +411,27 @@ ipcMain.handle("mouse:list-recordings", () => {
 })
 // ─────────────────────────────────────────────────────────────────────────────
 ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, extra?: number) => {
-  const move = `[WinMouse]::SetCursorPos(${Math.round(x)}, ${Math.round(y)})`
+  const rx = Math.round(x); const ry = Math.round(y)
+  if (isMac) {
+    // macOS: usa Python com Quartz CoreGraphics (disponível nativamente)
+    const pyScripts: Record<string, string> = {
+      move:        `import Quartz; Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, (${rx},${ry}), 0))`,
+      click:       `import Quartz,time; p=(${rx},${ry}); [Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, e, p, Quartz.kCGMouseButtonLeft)) for e in [Quartz.kCGEventMouseMoved, Quartz.kCGEventLeftMouseDown]]; time.sleep(0.05); Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, p, Quartz.kCGMouseButtonLeft))`,
+      doubleClick: `import Quartz,time; p=(${rx},${ry}); btn=Quartz.kCGMouseButtonLeft; [Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, e, p, btn)) for e in [Quartz.kCGEventMouseMoved, Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]]; time.sleep(0.08); [Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, e, p, btn)) for e in [Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp]]`,
+      rightClick:  `import Quartz,time; p=(${rx},${ry}); [Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, e, p, Quartz.kCGMouseButtonRight)) for e in [Quartz.kCGEventMouseMoved, Quartz.kCGEventRightMouseDown]]; time.sleep(0.05); Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventRightMouseUp, p, Quartz.kCGMouseButtonRight))`,
+      scroll:      `import Quartz; Quartz.CGEventPost(Quartz.kCGHIDEventTap, Quartz.CGEventCreateScrollWheelEvent(None, Quartz.kCGScrollEventUnitLine, 1, ${-Math.round((extra ?? 1) * 3)}))`,
+    }
+    const py = pyScripts[action]
+    if (py) await new Promise<void>((resolve) => {
+      exec(`python3 -c "${py.replace(/"/g, '\\"')}"`, (err) => {
+        if (err) console.warn("macOS mouse error:", err.message)
+        resolve()
+      })
+    })
+    return
+  }
+  // Windows: PowerShell / user32.dll
+  const move = `[WinMouse]::SetCursorPos(${rx}, ${ry})`
   const scripts: Record<string, string> = {
     move:        `${PS_MOUSE_TYPE}${move}`,
     click:       `${PS_MOUSE_TYPE}${move}; Start-Sleep -Milliseconds 50; [WinMouse]::mouse_event([WinMouse]::LDOWN,0,0,0,0); [WinMouse]::mouse_event([WinMouse]::LUP,0,0,0,0)`,
@@ -417,6 +442,31 @@ ipcMain.handle("mouse:action", async (_e, action: string, x: number, y: number, 
   const script = scripts[action]
   if (script) await runPS(script)
 })
+// ── Screenshot + Vision ──────────────────────────────────────────────────────
+ipcMain.handle("screenshot:analyze", async (_e, apiKey: string, prompt?: string) => {
+  const sources = await desktopCapturer.getSources({
+    types: ["screen"],
+    thumbnailSize: { width: 1280, height: 800 },
+  })
+  const source = sources[0]
+  if (!source) throw new Error("Nenhuma tela encontrada")
+  const base64 = source.thumbnail.toPNG().toString("base64")
+  const { default: OpenAI } = await import("openai")
+  const openai = new OpenAI({ apiKey })
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    max_tokens: 600,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "image_url", image_url: { url: `data:image/png;base64,${base64}`, detail: "low" } },
+        { type: "text", text: prompt ?? "Descreva o que está visível nesta tela de forma resumida e natural, como se estivesse contando para alguém." },
+      ],
+    }],
+  })
+  return res.choices[0].message.content ?? "Não consegui analisar a tela."
+})
+// ─────────────────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => (permission as string) === "media" || (permission as string) === "microphone")
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb((permission as string) === "media" || (permission as string) === "microphone"))
